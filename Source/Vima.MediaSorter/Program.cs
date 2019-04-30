@@ -13,7 +13,7 @@ namespace Vima.MediaSorter
         public static void Main(string[] args)
         {
             int count = 0;
-            const string mainFolderPath = "G:\\Pictures";
+            string mainFolderPath = Directory.GetCurrentDirectory();
             string[] files = Directory.GetFiles(mainFolderPath);
             foreach (string file in files)
             {
