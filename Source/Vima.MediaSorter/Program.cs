@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using ImageMagick;
 
 namespace Vima.MediaSorter
 {
     public class Program
     {
-        public static readonly List<string> ImageExtensions = new List<string> { ".JPG", ".JPE", ".BMP", ".GIF", ".PNG" };
+        public static readonly List<string> ImageExtensions = new List<string> {".JPG", ".JPE", ".BMP", ".GIF", ".PNG"};
 
         public static void Main(string[] args)
         {
@@ -29,11 +30,12 @@ namespace Vima.MediaSorter
 
                     string filePathInNewFolder = Path.Combine(newFolderPath, Path.GetFileName(file));
                     File.Move(file, filePathInNewFolder);
-
                 }
+
                 count++;
                 DrawTextProgressBar(count, files.Length);
             }
+
             Console.Out.WriteLine("Press enter to finish...");
             Console.ReadLine();
         }
@@ -52,39 +54,26 @@ namespace Vima.MediaSorter
                 if (string.IsNullOrEmpty(dateTimeCreated?.Value.ToString()))
                     return null;
 
-                DateTime time = DateTime.ParseExact(dateTimeCreated.Value.ToString(), "yyyy:MM:dd HH:mm:ss", CultureInfo.InvariantCulture);
+                DateTime time = DateTime.ParseExact(dateTimeCreated.Value.ToString(), "yyyy:MM:dd HH:mm:ss",
+                    CultureInfo.InvariantCulture);
                 return time;
             }
         }
 
         private static void DrawTextProgressBar(int progress, int total)
         {
+            const int numberOfSlots = 50;
+            var numberOfHashesPerFile = (float)numberOfSlots / total;
+            var numberOfHashesCompleted = (int)Math.Floor(progress * numberOfHashesPerFile);
+            var numberOfMissingHashes = numberOfSlots - numberOfHashesCompleted;
+
+            StringBuilder loadingBarBuilder = new StringBuilder();
+            loadingBarBuilder.Append('[');
+            loadingBarBuilder.Append(new string('#', numberOfHashesCompleted));
+            loadingBarBuilder.Append(new string(' ', numberOfMissingHashes));
+            loadingBarBuilder.Append(']');
             Console.SetCursorPosition(0, 0);
-
-            int slots = total < 20 ? total : 20;
-
-            string loadingBar = "[";
-
-            for (int i = 1; i <= slots; i++)
-            {
-                loadingBar += ' ';
-            }
-
-            loadingBar += ']';
-
-            Console.Write(loadingBar);
-
-            int count = 1;
-            for (int i = total / slots; i <= total; i += total / slots)
-            {
-                if (progress < i)
-                {
-                    break;
-                }
-                Console.SetCursorPosition(count, 0);
-                Console.Write('#');
-                count++;
-            }
+            Console.Write(loadingBarBuilder.ToString());
 
             Console.WriteLine();
             Console.WriteLine(progress + " of " + total);
