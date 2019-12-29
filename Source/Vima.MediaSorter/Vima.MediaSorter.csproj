@@ -2,10 +2,23 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
-  </PropertyGroup>  
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <OutputType>Exe</OutputType>
+    <StartupObject />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="icon.ico" />
+  </ItemGroup>  
 
   <ItemGroup>
     <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="7.14.5.0" />
+  </ItemGroup>  
+
+  <ItemGroup>
+    <Resource Include="icon.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
   </ItemGroup>  
 
 </Project>
