@@ -3,33 +3,42 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using ImageMagick;
 
 namespace Vima.MediaSorter
 {
     public class Program
     {
-        public static readonly List<string> ImageExtensions = new List<string> {".JPG", ".JPE", ".BMP", ".GIF", ".PNG"};
+        public static readonly List<string> ImageExtensions = new List<string> { ".JPG", ".JPE", ".BMP", ".GIF", ".PNG" };
+        public static readonly List<string> VideoExtensions = new List<string> { ".MP4", ".WMV", ".FLV", ".WAV", ".M4A" };
 
         public static void Main(string[] args)
         {
             int count = 0;
             string mainFolderPath = Directory.GetCurrentDirectory();
             string[] files = Directory.GetFiles(mainFolderPath);
+            
             foreach (string file in files)
             {
                 if (ImageExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                 {
-                    DateTime? value = GetImageDatetimeCreatedFromMetadata(file);
-                    if (value == null)
+                    DateTime? imageCreatedDate = GetImageDatetimeCreatedFromMetadata(file);
+                    if (imageCreatedDate == null)
+                    {
                         continue;
+                    }
 
-                    string newFolderName = value.Value.ToString("yyyy_MM_dd -");
-                    string newFolderPath = Path.Combine(mainFolderPath, newFolderName);
-                    Directory.CreateDirectory(newFolderPath);
-
-                    string filePathInNewFolder = Path.Combine(newFolderPath, Path.GetFileName(file));
-                    File.Move(file, filePathInNewFolder);
+                    MoveFile(mainFolderPath, file, imageCreatedDate);
+                }
+                else if (VideoExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
+                {
+                    DateTime? videoCreatedDate = GetVideoDateTime(file);
+                    if (videoCreatedDate == null)
+                    {
+                        continue;
+                    }
+                    MoveFile(mainFolderPath, file, videoCreatedDate);
                 }
 
                 count++;
@@ -38,6 +47,16 @@ namespace Vima.MediaSorter
 
             Console.Out.WriteLine("Press enter to finish...");
             Console.ReadLine();
+        }
+
+        private static void MoveFile(string mainFolderPath, string file, DateTime? createdDate)
+        {
+            string newFolderName = createdDate.Value.ToString("yyyy_MM_dd -");
+            string newFolderPath = Path.Combine(mainFolderPath, newFolderName);
+            Directory.CreateDirectory(newFolderPath);
+
+            string filePathInNewFolder = Path.Combine(newFolderPath, Path.GetFileName(file));
+            File.Move(file, filePathInNewFolder);
         }
 
         private static DateTime? GetImageDatetimeCreatedFromMetadata(string file)
@@ -59,6 +78,25 @@ namespace Vima.MediaSorter
                 return time;
             }
         }
+        private static DateTime? GetVideoDateTime(string file)
+        {
+            Regex rgx = new Regex(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])");
+            Match mat = rgx.Match(file); 
+            
+            if (!mat.Success)
+            {
+                return null;
+            }
+
+            GroupCollection groups = mat.Groups;
+            
+            int year = int.Parse(groups["year"].Value);
+            int month = int.Parse(groups["month"].Value);
+            int day = int.Parse(groups["day"].Value);
+
+            return new DateTime(year, month, day);
+
+        }
 
         private static void DrawTextProgressBar(int progress, int total)
         {
@@ -78,5 +116,6 @@ namespace Vima.MediaSorter
             Console.WriteLine();
             Console.WriteLine(progress + " of " + total);
         }
+
     }
 }
