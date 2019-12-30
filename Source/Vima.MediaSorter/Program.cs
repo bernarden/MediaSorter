@@ -11,7 +11,7 @@ namespace Vima.MediaSorter
     public class Program
     {
         public static readonly List<string> ImageExtensions = new List<string> { ".JPG", ".JPE", ".BMP", ".GIF", ".PNG" };
-        public static readonly List<string> VideoExtensions = new List<string> { ".MP4", ".WMV", ".FLV", ".WAV", ".M4A" };
+        public static readonly List<string> VideoExtensions = new List<string> { ".MP4" };
 
         public static void Main(string[] args)
         {
@@ -28,12 +28,11 @@ namespace Vima.MediaSorter
                     {
                         continue;
                     }
-
                     MoveFile(mainFolderPath, file, imageCreatedDate);
                 }
                 else if (VideoExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                 {
-                    DateTime? videoCreatedDate = GetVideoDateTime(file);
+                    DateTime? videoCreatedDate = GetVideoCreatedDateTimeFromName(file);
                     if (videoCreatedDate == null)
                     {
                         continue;
@@ -78,24 +77,20 @@ namespace Vima.MediaSorter
                 return time;
             }
         }
-        private static DateTime? GetVideoDateTime(string file)
+        private static DateTime? GetVideoCreatedDateTimeFromName(string file)
         {
             Regex rgx = new Regex(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])");
-            Match mat = rgx.Match(file); 
-            
+            Match mat = rgx.Match(file);             
             if (!mat.Success)
             {
                 return null;
             }
 
-            GroupCollection groups = mat.Groups;
-            
+            GroupCollection groups = mat.Groups;            
             int year = int.Parse(groups["year"].Value);
             int month = int.Parse(groups["month"].Value);
             int day = int.Parse(groups["day"].Value);
-
             return new DateTime(year, month, day);
-
         }
 
         private static void DrawTextProgressBar(int progress, int total)
@@ -116,6 +111,5 @@ namespace Vima.MediaSorter
             Console.WriteLine();
             Console.WriteLine(progress + " of " + total);
         }
-
     }
 }
