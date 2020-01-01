@@ -28,7 +28,7 @@ namespace Vima.MediaSorter
                     {
                         continue;
                     }
-                    MoveFile(mainFolderPath, file, imageCreatedDate);
+                    MoveFile(mainFolderPath, file, imageCreatedDate.Value);
                 }
                 else if (VideoExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                 {
@@ -37,7 +37,7 @@ namespace Vima.MediaSorter
                     {
                         continue;
                     }
-                    MoveFile(mainFolderPath, file, videoCreatedDate);
+                    MoveFile(mainFolderPath, file, videoCreatedDate.Value);
                 }
 
                 count++;
@@ -48,9 +48,9 @@ namespace Vima.MediaSorter
             Console.ReadLine();
         }
 
-        private static void MoveFile(string mainFolderPath, string file, DateTime? createdDate)
+        private static void MoveFile(string mainFolderPath, string file, DateTime createdDate)
         {
-            string newFolderName = createdDate.Value.ToString("yyyy_MM_dd -");
+            string newFolderName = createdDate.ToString("yyyy_MM_dd -");
             string newFolderPath = Path.Combine(mainFolderPath, newFolderName);
             Directory.CreateDirectory(newFolderPath);
 
