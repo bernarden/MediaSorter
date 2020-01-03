@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using ImageMagick;
@@ -10,15 +11,18 @@ namespace Vima.MediaSorter
 {
     public class Program
     {
-        public static readonly List<string> ImageExtensions = new List<string> { ".JPG", ".JPE", ".BMP", ".GIF", ".PNG" };
+        public static readonly List<string> ImageExtensions = new List<string>
+            { ".JPG", ".JPE", ".BMP", ".GIF", ".PNG" };
+
         public static readonly List<string> VideoExtensions = new List<string> { ".MP4" };
+        public static readonly List<string> DuplicateFiles = new List<string>();
 
         public static void Main(string[] args)
         {
             int count = 0;
             string mainFolderPath = Directory.GetCurrentDirectory();
             string[] files = Directory.GetFiles(mainFolderPath);
-            
+
             foreach (string file in files)
             {
                 if (ImageExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
@@ -42,7 +46,30 @@ namespace Vima.MediaSorter
                 DrawTextProgressBar(count, files.Length);
             }
 
-            Console.Out.WriteLine("Press enter to finish...");
+            if (DuplicateFiles.Any())
+            {
+                Console.Write($"Detected {DuplicateFiles.Count} duplicate file(s). ");
+                ConsoleKey response = ConsoleKey.Enter;
+                while (response != ConsoleKey.Y && response != ConsoleKey.N)
+                {
+                    Console.Write("Would you like to delete them? [y/n] ");
+                    response = Console.ReadKey(false).Key;
+                    if (response != ConsoleKey.Enter)
+                    {
+                        Console.WriteLine();
+                    }
+                }
+
+                if (response == ConsoleKey.Y)
+                {
+                    foreach (var duplicateFile in DuplicateFiles)
+                    {
+                        File.Delete(duplicateFile);
+                    }
+                }
+            }
+
+            Console.WriteLine("Press enter to finish...");
             Console.ReadLine();
         }
 
@@ -53,6 +80,23 @@ namespace Vima.MediaSorter
             Directory.CreateDirectory(newFolderPath);
 
             string filePathInNewFolder = Path.Combine(newFolderPath, Path.GetFileName(file));
+            if (File.Exists(filePathInNewFolder))
+            {
+                if (DuplicationHelper.AreFilesIdentical(file, filePathInNewFolder))
+                {
+                    DuplicateFiles.Add(file);
+                    return;
+                }
+
+                int count = 1;
+                do
+                {
+                    filePathInNewFolder = Path.Combine(newFolderPath,
+                        $"{Path.GetFileNameWithoutExtension(file)} ({count}){Path.GetExtension(file)}");
+                    count++;
+                } while (File.Exists(filePathInNewFolder));
+            }
+
             File.Move(file, filePathInNewFolder);
         }
 
@@ -75,16 +119,17 @@ namespace Vima.MediaSorter
                 return time;
             }
         }
+
         private static DateTime? GetVideoCreatedDateTimeFromName(string file)
         {
             Regex rgx = new Regex(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])");
-            Match mat = rgx.Match(file);             
+            Match mat = rgx.Match(file);
             if (!mat.Success)
             {
                 return null;
             }
 
-            GroupCollection groups = mat.Groups;            
+            GroupCollection groups = mat.Groups;
             int year = int.Parse(groups["year"].Value);
             int month = int.Parse(groups["month"].Value);
             int day = int.Parse(groups["day"].Value);
