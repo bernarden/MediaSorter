@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Helpers;
 
 namespace Vima.MediaSorter
@@ -12,91 +13,100 @@ namespace Vima.MediaSorter
             { ".JPG", ".JPE", ".BMP", ".GIF", ".PNG" };
 
         public static readonly List<string> VideoExtensions = new List<string> { ".MP4" };
-        public static readonly List<string> DuplicateFiles = new List<string>();
 
         public static void Main(string[] args)
         {
-            string mainFolderPath = Directory.GetCurrentDirectory();
-            string[] files = Directory.GetFiles(mainFolderPath);
-
-            Console.Write("Sorting your media... ");
-            using (ProgressBar progress = new ProgressBar())
-            {
-                for (var index = 0; index < files.Length; index++)
-                {
-                    string file = files[index];
-                    if (ImageExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
-                    {
-                        DateTime? imageCreatedDate = MediaMetadataHelper.GetImageDatetimeCreatedFromMetadata(file);
-                        if (imageCreatedDate != null)
-                        {
-                            MoveFile(mainFolderPath, file, imageCreatedDate.Value);
-                        }
-                    }
-                    else if (VideoExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
-                    {
-                        DateTime? videoCreatedDate = MediaMetadataHelper.GetVideoCreatedDateTimeFromName(file);
-                        if (videoCreatedDate != null)
-                        {
-                            MoveFile(mainFolderPath, file, videoCreatedDate.Value);
-                        }
-                    }
-
-                    progress.Report((double)index / files.Length);
-                }
-            }
-
-            Console.WriteLine("Done.");
-
-            if (DuplicateFiles.Any())
-            {
-                Console.Write($"Detected {DuplicateFiles.Count} duplicate file(s). ");
-                ConsoleKey response = ConsoleHelper.AskYesNoQuestion("Would you like to delete them?", ConsoleKey.N);
-
-                if (response == ConsoleKey.Y)
-                {
-                    Console.Write("Deleting duplicated files... ");
-                    using ProgressBar progress = new ProgressBar();
-                    for (var index = 0; index < DuplicateFiles.Count; index++)
-                    {
-                        var duplicateFile = DuplicateFiles[index];
-                        File.Delete(duplicateFile);
-                        progress.Report((double)index / DuplicateFiles.Count);
-                    }
-
-                    Console.WriteLine("Done.");
-                }
-            }
+            var sourceDirectory = Directory.GetCurrentDirectory();
+            var mediaFiles = IdentifyMediaFiles(sourceDirectory);
+            SortMedia(mediaFiles, sourceDirectory, out var duplicateFiles);
+            HandleDuplicatesIfExist(duplicateFiles);
 
             Console.WriteLine("Press enter to finish...");
             Console.ReadLine();
         }
 
-        private static void MoveFile(string mainFolderPath, string file, DateTime createdDate)
+        private static List<MediaFile> IdentifyMediaFiles(string sourceDirectory)
         {
-            string newFolderName = createdDate.ToString("yyyy_MM_dd -");
-            string newFolderPath = Path.Combine(mainFolderPath, newFolderName);
-            Directory.CreateDirectory(newFolderPath);
-
-            string filePathInNewFolder = Path.Combine(newFolderPath, Path.GetFileName(file));
-            if (File.Exists(filePathInNewFolder))
+            Console.Write("Identifying your media... ");
+            using ProgressBar progress = new ProgressBar();
+            var filePaths = Directory.GetFiles(sourceDirectory);
+            var mediaFiles = new List<MediaFile>();
+            for (var index = 0; index < filePaths.Length; index++)
             {
-                if (DuplicationHelper.AreFilesIdentical(file, filePathInNewFolder))
+                var filePath = filePaths[index];
+                if (ImageExtensions.Contains(Path.GetExtension(filePath).ToUpperInvariant()))
                 {
-                    DuplicateFiles.Add(file);
-                    return;
+                    mediaFiles.Add(new MediaFile(filePath, MediaFile.Type.Image));
+                }
+                else if (VideoExtensions.Contains(Path.GetExtension(filePath).ToUpperInvariant()))
+                {
+                    mediaFiles.Add(new MediaFile(filePath, MediaFile.Type.Video));
                 }
 
-                int count = 1;
-                do
-                {
-                    filePathInNewFolder = Path.Combine(newFolderPath,
-                        $"{Path.GetFileNameWithoutExtension(file)} ({count}){Path.GetExtension(file)}");
-                    count++;
-                } while (File.Exists(filePathInNewFolder));
+                progress.Report((double)index / filePaths.Length);
             }
 
-            File.Move(file, filePathInNewFolder);
+            Console.WriteLine("Done.");
+            return mediaFiles;
+        }
+
+        private static void SortMedia(IReadOnlyList<MediaFile> files, string destination,
+            out IList<MediaFile> duplicateFiles)
+        {
+            duplicateFiles = new List<MediaFile>();
+            if (!files.Any())
+            {
+                Console.WriteLine("No media files found.");
+                return;
+            }
+
+            Console.Write("Sorting your media... ");
+            using (ProgressBar progress = new ProgressBar())
+            {
+                for (var index = 0; index < files.Count; index++)
+                {
+                    MediaFile file = files[index];
+                    var createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
+                    if (createdDateTime != null)
+                    {
+                        var result = FileMovingHelper.MoveFile(destination, file.FilePath, createdDateTime.Value);
+                        if (result == FileMovingHelper.MoveStatus.Duplicate)
+                        {
+                            duplicateFiles.Add(file);
+                        }
+                    }
+
+                    progress.Report((double)index / files.Count);
+                }
+            }
+
+            Console.WriteLine("Done.");
+        }
+
+        private static void HandleDuplicatesIfExist(IList<MediaFile> duplicateFiles)
+        {
+            if (!duplicateFiles.Any())
+            {
+                return;
+            }
+
+            Console.Write($"Detected {duplicateFiles.Count} duplicate file(s). ");
+            ConsoleKey response = ConsoleHelper.AskYesNoQuestion("Would you like to delete them?", ConsoleKey.N);
+            if (response != ConsoleKey.Y)
+            {
+                return;
+            }
+
+            Console.Write("Deleting duplicated files... ");
+            using ProgressBar progress = new ProgressBar();
+            for (var index = 0; index < duplicateFiles.Count; index++)
+            {
+                var duplicateFile = duplicateFiles[index];
+                File.Delete(duplicateFile.FilePath);
+                progress.Report((double)index / duplicateFiles.Count);
+            }
+
+            Console.WriteLine("Done.");
         }
     }
 }
