@@ -9,8 +9,7 @@ namespace Vima.MediaSorter
 {
     public class Program
     {
-        public static readonly List<string> ImageExtensions = new List<string>
-            { ".JPG", ".JPE", ".BMP", ".GIF", ".PNG" };
+        public static readonly List<string> ImageExtensions = new List<string> { ".JPG" };
 
         public static readonly List<string> VideoExtensions = new List<string> { ".MP4" };
 

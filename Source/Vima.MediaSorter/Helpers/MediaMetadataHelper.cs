@@ -1,7 +1,10 @@
 ﻿using System;
-using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
-using ImageMagick;
+using MetadataExtractor;
+using MetadataExtractor.Formats.Exif;
+using MetadataExtractor.Formats.Jpeg;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Helpers
@@ -20,20 +23,10 @@ namespace Vima.MediaSorter.Helpers
 
         public static DateTime? GetImageDatetimeCreatedFromMetadata(string filePath)
         {
-            using var image = new MagickImage(filePath);
-            ExifProfile profile = image.GetExifProfile();
-            if (profile == null)
-            {
-                return null;
-            }
-
-            var dateTimeCreated = profile.GetValue(ExifTag.DateTimeOriginal);
-            if (string.IsNullOrEmpty(dateTimeCreated?.Value.ToString()))
-                return null;
-
-            DateTime time = DateTime.ParseExact(dateTimeCreated.Value.ToString(), "yyyy:MM:dd HH:mm:ss",
-                CultureInfo.InvariantCulture);
-            return time;
+            using FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            var directories = JpegMetadataReader.ReadMetadata(fs, new[] { new ExifReader() });
+            var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
+            return subIfdDirectory?.GetDateTime(ExifDirectoryBase.TagDateTimeOriginal);
         }
 
         public static DateTime? GetVideoCreatedDateTimeFromName(string filePath)
