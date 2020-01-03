@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using ImageMagick;
 
-namespace Vima.MediaSorter
+namespace Vima.MediaSorter.Helpers
 {
     public class MediaMetadataHelper
     {

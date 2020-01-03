@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
+using Vima.MediaSorter.Helpers;
 
 namespace Vima.MediaSorter
 {
@@ -16,53 +16,55 @@ namespace Vima.MediaSorter
 
         public static void Main(string[] args)
         {
-            int numberOfProcessedFiles = 0;
             string mainFolderPath = Directory.GetCurrentDirectory();
             string[] files = Directory.GetFiles(mainFolderPath);
 
-            foreach (string file in files)
+            Console.Write("Sorting your media... ");
+            using (ProgressBar progress = new ProgressBar())
             {
-                if (ImageExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
+                for (var index = 0; index < files.Length; index++)
                 {
-                    DateTime? imageCreatedDate = MediaMetadataHelper.GetImageDatetimeCreatedFromMetadata(file);
-                    if (imageCreatedDate != null)
+                    string file = files[index];
+                    if (ImageExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                     {
-                        MoveFile(mainFolderPath, file, imageCreatedDate.Value);
+                        DateTime? imageCreatedDate = MediaMetadataHelper.GetImageDatetimeCreatedFromMetadata(file);
+                        if (imageCreatedDate != null)
+                        {
+                            MoveFile(mainFolderPath, file, imageCreatedDate.Value);
+                        }
                     }
-                }
-                else if (VideoExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
-                {
-                    DateTime? videoCreatedDate = MediaMetadataHelper.GetVideoCreatedDateTimeFromName(file);
-                    if (videoCreatedDate != null)
+                    else if (VideoExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                     {
-                        MoveFile(mainFolderPath, file, videoCreatedDate.Value);
+                        DateTime? videoCreatedDate = MediaMetadataHelper.GetVideoCreatedDateTimeFromName(file);
+                        if (videoCreatedDate != null)
+                        {
+                            MoveFile(mainFolderPath, file, videoCreatedDate.Value);
+                        }
                     }
-                }
 
-                numberOfProcessedFiles++;
-                DrawTextProgressBar(numberOfProcessedFiles, files.Length);
+                    progress.Report((double)index / files.Length);
+                }
             }
+
+            Console.WriteLine("Done.");
 
             if (DuplicateFiles.Any())
             {
                 Console.Write($"Detected {DuplicateFiles.Count} duplicate file(s). ");
-                ConsoleKey response = ConsoleKey.Enter;
-                while (response != ConsoleKey.Y && response != ConsoleKey.N)
-                {
-                    Console.Write("Would you like to delete them? [y/n] ");
-                    response = Console.ReadKey(false).Key;
-                    if (response != ConsoleKey.Enter)
-                    {
-                        Console.WriteLine();
-                    }
-                }
+                ConsoleKey response = ConsoleHelper.AskYesNoQuestion("Would you like to delete them?", ConsoleKey.N);
 
                 if (response == ConsoleKey.Y)
                 {
-                    foreach (var duplicateFile in DuplicateFiles)
+                    Console.Write("Deleting duplicated files... ");
+                    using ProgressBar progress = new ProgressBar();
+                    for (var index = 0; index < DuplicateFiles.Count; index++)
                     {
+                        var duplicateFile = DuplicateFiles[index];
                         File.Delete(duplicateFile);
+                        progress.Report((double)index / DuplicateFiles.Count);
                     }
+
+                    Console.WriteLine("Done.");
                 }
             }
 
@@ -95,25 +97,6 @@ namespace Vima.MediaSorter
             }
 
             File.Move(file, filePathInNewFolder);
-        }
-
-        private static void DrawTextProgressBar(int progress, int total)
-        {
-            const int numberOfSlots = 50;
-            var numberOfHashesPerFile = (float)numberOfSlots / total;
-            var numberOfHashesCompleted = (int)Math.Floor(progress * numberOfHashesPerFile);
-            var numberOfMissingHashes = numberOfSlots - numberOfHashesCompleted;
-
-            StringBuilder loadingBarBuilder = new StringBuilder();
-            loadingBarBuilder.Append('[');
-            loadingBarBuilder.Append(new string('#', numberOfHashesCompleted));
-            loadingBarBuilder.Append(new string(' ', numberOfMissingHashes));
-            loadingBarBuilder.Append(']');
-            Console.SetCursorPosition(0, 0);
-            Console.Write(loadingBarBuilder.ToString());
-
-            Console.WriteLine();
-            Console.WriteLine(progress + " of " + total);
         }
     }
 }
