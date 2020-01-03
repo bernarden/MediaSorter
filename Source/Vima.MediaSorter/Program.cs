@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -24,20 +24,18 @@ namespace Vima.MediaSorter
                 if (ImageExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                 {
                     DateTime? imageCreatedDate = GetImageDatetimeCreatedFromMetadata(file);
-                    if (imageCreatedDate == null)
+                    if (imageCreatedDate != null)
                     {
-                        continue;
+                        MoveFile(mainFolderPath, file, imageCreatedDate.Value);
                     }
-                    MoveFile(mainFolderPath, file, imageCreatedDate.Value);
                 }
                 else if (VideoExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                 {
                     DateTime? videoCreatedDate = GetVideoCreatedDateTimeFromName(file);
-                    if (videoCreatedDate == null)
+                    if (videoCreatedDate != null)
                     {
-                        continue;
+                        MoveFile(mainFolderPath, file, videoCreatedDate.Value);
                     }
-                    MoveFile(mainFolderPath, file, videoCreatedDate.Value);
                 }
 
                 count++;
