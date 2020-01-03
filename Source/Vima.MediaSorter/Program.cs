@@ -1,11 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
-using ImageMagick;
 
 namespace Vima.MediaSorter
 {
@@ -19,7 +16,7 @@ namespace Vima.MediaSorter
 
         public static void Main(string[] args)
         {
-            int count = 0;
+            int numberOfProcessedFiles = 0;
             string mainFolderPath = Directory.GetCurrentDirectory();
             string[] files = Directory.GetFiles(mainFolderPath);
 
@@ -27,7 +24,7 @@ namespace Vima.MediaSorter
             {
                 if (ImageExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                 {
-                    DateTime? imageCreatedDate = GetImageDatetimeCreatedFromMetadata(file);
+                    DateTime? imageCreatedDate = MediaMetadataHelper.GetImageDatetimeCreatedFromMetadata(file);
                     if (imageCreatedDate != null)
                     {
                         MoveFile(mainFolderPath, file, imageCreatedDate.Value);
@@ -35,15 +32,15 @@ namespace Vima.MediaSorter
                 }
                 else if (VideoExtensions.Contains(Path.GetExtension(file).ToUpperInvariant()))
                 {
-                    DateTime? videoCreatedDate = GetVideoCreatedDateTimeFromName(file);
+                    DateTime? videoCreatedDate = MediaMetadataHelper.GetVideoCreatedDateTimeFromName(file);
                     if (videoCreatedDate != null)
                     {
                         MoveFile(mainFolderPath, file, videoCreatedDate.Value);
                     }
                 }
 
-                count++;
-                DrawTextProgressBar(count, files.Length);
+                numberOfProcessedFiles++;
+                DrawTextProgressBar(numberOfProcessedFiles, files.Length);
             }
 
             if (DuplicateFiles.Any())
@@ -98,42 +95,6 @@ namespace Vima.MediaSorter
             }
 
             File.Move(file, filePathInNewFolder);
-        }
-
-        private static DateTime? GetImageDatetimeCreatedFromMetadata(string file)
-        {
-            using (var image = new MagickImage(file))
-            {
-                ExifProfile profile = image.GetExifProfile();
-                if (profile == null)
-                {
-                    return null;
-                }
-
-                var dateTimeCreated = profile.GetValue(ExifTag.DateTimeOriginal);
-                if (string.IsNullOrEmpty(dateTimeCreated?.Value.ToString()))
-                    return null;
-
-                DateTime time = DateTime.ParseExact(dateTimeCreated.Value.ToString(), "yyyy:MM:dd HH:mm:ss",
-                    CultureInfo.InvariantCulture);
-                return time;
-            }
-        }
-
-        private static DateTime? GetVideoCreatedDateTimeFromName(string file)
-        {
-            Regex rgx = new Regex(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])");
-            Match mat = rgx.Match(file);
-            if (!mat.Success)
-            {
-                return null;
-            }
-
-            GroupCollection groups = mat.Groups;
-            int year = int.Parse(groups["year"].Value);
-            int month = int.Parse(groups["month"].Value);
-            int day = int.Parse(groups["day"].Value);
-            return new DateTime(year, month, day);
         }
 
         private static void DrawTextProgressBar(int progress, int total)
