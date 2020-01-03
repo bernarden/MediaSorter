@@ -2,14 +2,25 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using ImageMagick;
+using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Helpers
 {
     public class MediaMetadataHelper
     {
-        public static DateTime? GetImageDatetimeCreatedFromMetadata(string file)
+        public static DateTime? GetCreatedDateTime(MediaFile file)
         {
-            using var image = new MagickImage(file);
+            return file.MediaType switch
+            {
+                MediaFile.Type.Image => GetImageDatetimeCreatedFromMetadata(file.FilePath),
+                MediaFile.Type.Video => GetVideoCreatedDateTimeFromName(file.FilePath),
+                _ => throw new ArgumentOutOfRangeException()
+            };
+        }
+
+        public static DateTime? GetImageDatetimeCreatedFromMetadata(string filePath)
+        {
+            using var image = new MagickImage(filePath);
             ExifProfile profile = image.GetExifProfile();
             if (profile == null)
             {
@@ -25,10 +36,10 @@ namespace Vima.MediaSorter.Helpers
             return time;
         }
 
-        public static DateTime? GetVideoCreatedDateTimeFromName(string file)
+        public static DateTime? GetVideoCreatedDateTimeFromName(string filePath)
         {
             Regex rgx = new Regex(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])");
-            Match mat = rgx.Match(file);
+            Match mat = rgx.Match(filePath);
             if (!mat.Success)
             {
                 return null;
