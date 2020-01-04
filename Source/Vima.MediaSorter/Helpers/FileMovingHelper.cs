@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Vima.MediaSorter.Helpers
 {
     public class FileMovingHelper
     {
+        public static readonly HashSet<string> PreviouslyCreatedFolders = new HashSet<string>();
+
         public enum MoveStatus
         {
             Success,
@@ -15,8 +18,12 @@ namespace Vima.MediaSorter.Helpers
         {
             string newFolderName = createdDate.ToString("yyyy_MM_dd -");
             string newFolderPath = Path.Combine(mainFolderPath, newFolderName);
-            Directory.CreateDirectory(newFolderPath);
-
+            if (!PreviouslyCreatedFolders.Contains(newFolderPath))
+            {
+                Directory.CreateDirectory(newFolderPath);
+                PreviouslyCreatedFolders.Add(newFolderPath);
+            }
+            
             string filePathInNewFolder = Path.Combine(newFolderPath, Path.GetFileName(filePath));
             if (File.Exists(filePathInNewFolder))
             {
