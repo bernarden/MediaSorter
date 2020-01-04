@@ -26,7 +26,13 @@ namespace Vima.MediaSorter.Helpers
             using FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
             var directories = JpegMetadataReader.ReadMetadata(fs, new[] { new ExifReader() });
             var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
-            return subIfdDirectory?.GetDateTime(ExifDirectoryBase.TagDateTimeOriginal);
+            if (subIfdDirectory == null) return null;
+            if (subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime result))
+            {
+                return result;
+            }
+
+            return null;
         }
 
         public static DateTime? GetVideoCreatedDateTimeFromName(string filePath)
