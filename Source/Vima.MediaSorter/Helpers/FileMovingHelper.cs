@@ -18,6 +18,11 @@ namespace Vima.MediaSorter.Helpers
         {
             string newFolderName = createdDate.ToString("yyyy_MM_dd -");
             string newFolderPath = Path.Combine(mainFolderPath, newFolderName);
+            return MoveFile(filePath, newFolderPath);
+        }
+        
+        private static MoveStatus MoveFile(string filePath, string newFolderPath)
+        {
             if (!PreviouslyCreatedFolders.Contains(newFolderPath))
             {
                 Directory.CreateDirectory(newFolderPath);
@@ -45,7 +50,8 @@ namespace Vima.MediaSorter.Helpers
             int count = 1;
             do
             {
-                string fileName = $"{Path.GetFileNameWithoutExtension(filePath)} ({count}){Path.GetExtension(filePath)}";
+                string fileName =
+                    $"{Path.GetFileNameWithoutExtension(filePath)} ({count}){Path.GetExtension(filePath)}";
                 filePathInNewFolder = Path.Combine(newFolderPath, fileName);
                 count++;
             } while (File.Exists(filePathInNewFolder));
