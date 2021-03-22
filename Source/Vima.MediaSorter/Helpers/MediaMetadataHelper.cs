@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -23,9 +24,10 @@ namespace Vima.MediaSorter.Helpers
 
         public static DateTime? GetImageDatetimeCreatedFromMetadata(string filePath)
         {
-            using FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-            var directories = JpegMetadataReader.ReadMetadata(fs, new[] { new ExifReader() });
-            var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
+            using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
+            IReadOnlyList<MetadataExtractor.Directory> directories =
+                JpegMetadataReader.ReadMetadata(fs, new[] { new ExifReader() });
+            ExifSubIfdDirectory subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
             if (subIfdDirectory == null) return null;
             if (subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime result))
             {
@@ -37,7 +39,7 @@ namespace Vima.MediaSorter.Helpers
 
         public static DateTime? GetVideoCreatedDateTimeFromName(string filePath)
         {
-            Regex rgx = new Regex(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])");
+            Regex rgx = new(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])");
             Match mat = rgx.Match(filePath);
             if (!mat.Success)
             {
