@@ -6,7 +6,7 @@ namespace Vima.MediaSorter.Helpers
 {
     public class FileMovingHelper
     {
-        public static readonly HashSet<string> PreviouslyCreatedFolders = new HashSet<string>();
+        public static readonly HashSet<string> PreviouslyCreatedFolders = new();
 
         public enum MoveStatus
         {
@@ -23,7 +23,7 @@ namespace Vima.MediaSorter.Helpers
                 Directory.CreateDirectory(newFolderPath);
                 PreviouslyCreatedFolders.Add(newFolderPath);
             }
-            
+
             string filePathInNewFolder = Path.Combine(newFolderPath, Path.GetFileName(filePath));
             if (File.Exists(filePathInNewFolder))
             {
@@ -42,10 +42,10 @@ namespace Vima.MediaSorter.Helpers
         private static string GenerateUniqueName(string filePath, string newFolderPath)
         {
             string filePathInNewFolder;
-            var count = 1;
+            int count = 1;
             do
             {
-                var fileName = $"{Path.GetFileNameWithoutExtension(filePath)} ({count}){Path.GetExtension(filePath)}";
+                string fileName = $"{Path.GetFileNameWithoutExtension(filePath)} ({count}){Path.GetExtension(filePath)}";
                 filePathInNewFolder = Path.Combine(newFolderPath, fileName);
                 count++;
             } while (File.Exists(filePathInNewFolder));

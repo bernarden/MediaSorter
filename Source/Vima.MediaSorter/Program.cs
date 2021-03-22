@@ -9,15 +9,15 @@ namespace Vima.MediaSorter
 {
     public class Program
     {
-        public static readonly List<string> ImageExtensions = new List<string> { ".JPG" };
+        public static readonly List<string> ImageExtensions = new() { ".JPG" };
 
-        public static readonly List<string> VideoExtensions = new List<string> { ".MP4" };
+        public static readonly List<string> VideoExtensions = new() { ".MP4" };
 
         public static void Main(string[] args)
         {
-            var sourceDirectory = Directory.GetCurrentDirectory();
-            var mediaFiles = IdentifyMediaFiles(sourceDirectory);
-            SortMedia(mediaFiles, sourceDirectory, out var duplicateFiles);
+            string sourceDirectory = Directory.GetCurrentDirectory();
+            List<MediaFile> mediaFiles = IdentifyMediaFiles(sourceDirectory);
+            SortMedia(mediaFiles, sourceDirectory, out IList<MediaFile> duplicateFiles);
             HandleDuplicatesIfExist(duplicateFiles);
 
             Console.WriteLine("Press enter to finish...");
@@ -27,12 +27,12 @@ namespace Vima.MediaSorter
         private static List<MediaFile> IdentifyMediaFiles(string sourceDirectory)
         {
             Console.Write("Identifying your media... ");
-            using ProgressBar progress = new ProgressBar();
-            var filePaths = Directory.GetFiles(sourceDirectory);
-            var mediaFiles = new List<MediaFile>();
-            for (var index = 0; index < filePaths.Length; index++)
+            using ProgressBar progress = new();
+            string[] filePaths = Directory.GetFiles(sourceDirectory);
+            List<MediaFile> mediaFiles = new();
+            for (int index = 0; index < filePaths.Length; index++)
             {
-                var filePath = filePaths[index];
+                string filePath = filePaths[index];
                 if (ImageExtensions.Contains(Path.GetExtension(filePath).ToUpperInvariant()))
                 {
                     mediaFiles.Add(new MediaFile(filePath, MediaFile.Type.Image));
@@ -42,7 +42,7 @@ namespace Vima.MediaSorter
                     mediaFiles.Add(new MediaFile(filePath, MediaFile.Type.Video));
                 }
 
-                progress.Report((double)index / filePaths.Length);
+                progress.Report((double) index / filePaths.Length);
             }
 
             Console.WriteLine("Done.");
@@ -60,22 +60,23 @@ namespace Vima.MediaSorter
             }
 
             Console.Write("Sorting your media... ");
-            using (ProgressBar progress = new ProgressBar())
+            using (ProgressBar progress = new())
             {
-                for (var index = 0; index < files.Count; index++)
+                for (int index = 0; index < files.Count; index++)
                 {
                     MediaFile file = files[index];
-                    var createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
+                    DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
                     if (createdDateTime != null)
                     {
-                        var result = FileMovingHelper.MoveFile(destination, file.FilePath, createdDateTime.Value);
+                        FileMovingHelper.MoveStatus result =
+                            FileMovingHelper.MoveFile(destination, file.FilePath, createdDateTime.Value);
                         if (result == FileMovingHelper.MoveStatus.Duplicate)
                         {
                             duplicateFiles.Add(file);
                         }
                     }
 
-                    progress.Report((double)index / files.Count);
+                    progress.Report((double) index / files.Count);
                 }
             }
 
@@ -97,12 +98,12 @@ namespace Vima.MediaSorter
             }
 
             Console.Write("Deleting duplicated files... ");
-            using ProgressBar progress = new ProgressBar();
-            for (var index = 0; index < duplicateFiles.Count; index++)
+            using ProgressBar progress = new();
+            for (int index = 0; index < duplicateFiles.Count; index++)
             {
-                var duplicateFile = duplicateFiles[index];
+                MediaFile duplicateFile = duplicateFiles[index];
                 File.Delete(duplicateFile.FilePath);
-                progress.Report((double)index / duplicateFiles.Count);
+                progress.Report((double) index / duplicateFiles.Count);
             }
 
             Console.WriteLine("Done.");
