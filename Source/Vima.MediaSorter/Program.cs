@@ -65,15 +65,22 @@ namespace Vima.MediaSorter
                 for (int index = 0; index < files.Count; index++)
                 {
                     MediaFile file = files[index];
-                    DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
-                    if (createdDateTime != null)
+                    try
                     {
-                        FileMovingHelper.MoveStatus result =
-                            FileMovingHelper.MoveFile(destination, file.FilePath, createdDateTime.Value);
-                        if (result == FileMovingHelper.MoveStatus.Duplicate)
+                        DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
+                        if (createdDateTime != null)
                         {
-                            duplicateFiles.Add(file);
+                            FileMovingHelper.MoveStatus result =
+                                FileMovingHelper.MoveFile(destination, file.FilePath, createdDateTime.Value);
+                            if (result == FileMovingHelper.MoveStatus.Duplicate)
+                            {
+                                duplicateFiles.Add(file);
+                            }
                         }
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
                     }
 
                     progress.Report((double) index / files.Count);
