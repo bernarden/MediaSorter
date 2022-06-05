@@ -41,7 +41,7 @@ namespace Vima.MediaSorter.Domain
             Interlocked.Exchange(ref _currentProgress, value);
         }
 
-        private void TimerHandler(object state)
+        private void TimerHandler(object? state)
         {
             lock (_timer)
             {
