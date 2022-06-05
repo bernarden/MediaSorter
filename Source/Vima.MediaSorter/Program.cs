@@ -45,6 +45,7 @@ namespace Vima.MediaSorter
                 progress.Report((double) index / filePaths.Length);
             }
 
+            progress.Dispose();
             Console.WriteLine("Done.");
             return mediaFiles;
         }
@@ -60,33 +61,32 @@ namespace Vima.MediaSorter
             }
 
             Console.Write("Sorting your media... ");
-            using (ProgressBar progress = new())
+            using ProgressBar progress = new();
+            for (int index = 0; index < files.Count; index++)
             {
-                for (int index = 0; index < files.Count; index++)
+                MediaFile file = files[index];
+                try
                 {
-                    MediaFile file = files[index];
-                    try
+                    DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
+                    if (createdDateTime != null)
                     {
-                        DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
-                        if (createdDateTime != null)
+                        FileMovingHelper.MoveStatus result =
+                            FileMovingHelper.MoveFile(destination, file.FilePath, createdDateTime.Value);
+                        if (result == FileMovingHelper.MoveStatus.Duplicate)
                         {
-                            FileMovingHelper.MoveStatus result =
-                                FileMovingHelper.MoveFile(destination, file.FilePath, createdDateTime.Value);
-                            if (result == FileMovingHelper.MoveStatus.Duplicate)
-                            {
-                                duplicateFiles.Add(file);
-                            }
+                            duplicateFiles.Add(file);
                         }
                     }
-                    catch (Exception)
-                    {
-                        // ignored
-                    }
-
-                    progress.Report((double) index / files.Count);
                 }
-            }
+                catch (Exception)
+                {
+                    // ignored
+                }
 
+                progress.Report((double) index / files.Count);
+            }
+            
+            progress.Dispose();
             Console.WriteLine("Done.");
         }
 
@@ -113,6 +113,7 @@ namespace Vima.MediaSorter
                 progress.Report((double) index / duplicateFiles.Count);
             }
 
+            progress.Dispose();
             Console.WriteLine("Done.");
         }
     }
