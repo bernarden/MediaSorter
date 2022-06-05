@@ -27,7 +27,7 @@ namespace Vima.MediaSorter.Helpers
             using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
             IReadOnlyList<MetadataExtractor.Directory> directories =
                 JpegMetadataReader.ReadMetadata(fs, new[] { new ExifReader() });
-            ExifSubIfdDirectory subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
+            ExifSubIfdDirectory? subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
             if (subIfdDirectory == null) return null;
             if (subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime result))
             {
