@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 
 namespace Vima.MediaSorter.Helpers;
@@ -14,22 +13,15 @@ public class FileMovingHelper
         Duplicate
     }
 
-    public static (MoveStatus, string?) MoveFile(string mainFolderPath, string filePath, DateTime createdDate)
+    public static (MoveStatus, string?) MoveFile(string filePath, string destinationFolderPath)
     {
-        string newFolderName = createdDate.ToString("yyyy_MM_dd -");
-        string newFolderPath = Path.Combine(mainFolderPath, newFolderName);
-        return MoveFile(filePath, newFolderPath);
-    }
-        
-    private static (MoveStatus, string?) MoveFile(string filePath, string newFolderPath)
-    {
-        if (!PreviouslyCreatedFolders.Contains(newFolderPath))
+        if (!PreviouslyCreatedFolders.Contains(destinationFolderPath))
         {
-            Directory.CreateDirectory(newFolderPath);
-            PreviouslyCreatedFolders.Add(newFolderPath);
+            Directory.CreateDirectory(destinationFolderPath);
+            PreviouslyCreatedFolders.Add(destinationFolderPath);
         }
 
-        string filePathInNewFolder = Path.Combine(newFolderPath, Path.GetFileName(filePath));
+        string filePathInNewFolder = Path.Combine(destinationFolderPath, Path.GetFileName(filePath));
         if (File.Exists(filePathInNewFolder))
         {
             if (DuplicationHelper.AreFilesIdentical(filePath, filePathInNewFolder))
@@ -37,7 +29,7 @@ public class FileMovingHelper
                 return (MoveStatus.Duplicate, filePathInNewFolder);
             }
 
-            filePathInNewFolder = GenerateUniqueName(filePath, newFolderPath);
+            filePathInNewFolder = GenerateUniqueName(filePath, destinationFolderPath);
         }
 
         File.Move(filePath, filePathInNewFolder);
