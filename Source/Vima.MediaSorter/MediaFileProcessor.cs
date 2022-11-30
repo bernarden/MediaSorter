@@ -119,6 +119,7 @@ public class MediaFileProcessor
 
         Console.Write("Sorting your media... ");
         using ProgressBar progress = new();
+        List<string> stepLogs = new();
         int processedFileCounter = 0;
         Parallel.ForEach(files,
             new ParallelOptions { MaxDegreeOfParallelism = 25 },
@@ -135,10 +136,15 @@ public class MediaFileProcessor
                             MoveFile(filePath, createdDateTime.Value);
                         }
                     }
+                    else
+                    {
+                        stepLogs.Add($"\tWarning: No creation date detected: {file.FilePath}");
+                    }
                 }
                 catch (Exception)
                 {
                     // ignored
+                    stepLogs.Add($"\tWarning: Failed to sort: {file.FilePath}");
                 }
 
                 Interlocked.Increment(ref processedFileCounter);
@@ -147,6 +153,9 @@ public class MediaFileProcessor
 
         progress.Dispose();
         Console.WriteLine("Done.");
+
+        foreach (string stepLog in stepLogs)
+            Console.WriteLine(stepLog);
     }
 
     private void MoveFile(string filePath, DateTime createdDateTime)
