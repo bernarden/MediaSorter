@@ -146,7 +146,7 @@ public class MediaFileProcessor
 
     private void MoveFile(string filePath, DateTime createdDateTime)
     {
-        if (!_dateToExistingDirectoryMapping.TryGetValue(createdDateTime, out string? directoryName))
+        if (!_dateToExistingDirectoryMapping.TryGetValue(createdDateTime.Date, out string? directoryName))
         {
             directoryName = createdDateTime.ToString("yyyy_MM_dd -");
         }
