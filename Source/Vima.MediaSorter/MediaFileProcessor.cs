@@ -67,9 +67,16 @@ public class MediaFileProcessor
             _dateToExistingDirectoryMapping.Add(result.Date, directoryName);
         }
 
-        string[] filePaths = Directory.GetFiles(_sourceDirectory);
+        // Get all file paths from source and children directories.
+        IEnumerable<string> directoriesToScan = new List<string> { _sourceDirectory }.Concat(directoryPaths);
+        List<string> filePaths = new();
+        foreach (string directoryToScan in directoriesToScan)
+        {
+            filePaths.AddRange(Directory.GetFiles(directoryToScan));
+        }
+
         List<MediaFile> mediaFiles = new();
-        for (int index = 0; index < filePaths.Length; index++)
+        for (int index = 0; index < filePaths.Count; index++)
         {
             string filePath = filePaths[index];
             if (ImageExtensions.Contains(Path.GetExtension(filePath).ToUpperInvariant()))
@@ -88,7 +95,7 @@ public class MediaFileProcessor
                 _ignoredFiles.Add(filePath);
             }
 
-            progress.Report((double)index / filePaths.Length);
+            progress.Report((double)index / filePaths.Count);
         }
 
         progress.Dispose();
