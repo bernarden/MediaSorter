@@ -11,13 +11,13 @@ namespace Vima.MediaSorter;
 public class MediaFileProcessor
 {
     public static readonly string FolderNameFormat = "yyyy_MM_dd -";
-    public static readonly List<string> ImageExtensions = new() { ".JPG" };
+    public static readonly List<string> ImageExtensions = new() { ".JPG", ".JPEG" };
     public static readonly List<string> VideoExtensions = new() { ".MP4" };
     private readonly IList<DuplicateFile> _duplicateFiles;
     private readonly string _sourceDirectory;
     private readonly Dictionary<DateTime, string> _dateToExistingDirectoryMapping = new();
-    private readonly List<string> _skippedExistingDirectories = new();
-    
+    private readonly List<string> _ignoredFiles = new();
+
     public MediaFileProcessor(string sourceDirectory)
     {
         _sourceDirectory = sourceDirectory;
@@ -36,7 +36,9 @@ public class MediaFileProcessor
 
     private List<MediaFile> IdentifyMediaFiles()
     {
-        Console.WriteLine("Identifying your media... ");
+        Console.Write("Identifying your media... ");
+        using ProgressBar progress = new();
+        List<string> stepLogs = new();
 
         // Find previously used media directories.
         string[] directoryPaths = Directory.GetDirectories(_sourceDirectory);
@@ -45,8 +47,6 @@ public class MediaFileProcessor
             string directoryName = new DirectoryInfo(directoryPath).Name;
             if (directoryName.Length < FolderNameFormat.Length)
             {
-                Console.WriteLine($"\tWarning: Skipping media directory: '{directoryName}'.");
-                _skippedExistingDirectories.Add(directoryName);
                 continue;
             }
 
@@ -54,20 +54,19 @@ public class MediaFileProcessor
             if (!DateTime.TryParseExact(directoryNameBeginning, FolderNameFormat,
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result))
             {
-                Console.WriteLine($"\tWarning: Skipping media directory: '{directoryName}'.");
-                _skippedExistingDirectories.Add(directoryName);
                 continue;
             }
 
             if (_dateToExistingDirectoryMapping.TryGetValue(result.Date, out string? existingDirectoryName))
             {
-                Console.WriteLine($"\tWarning: Multiple existing directories mapped to date: '${result.ToShortDateString()}'. Only '{existingDirectoryName}' is going to be used.");
+                stepLogs.Add(
+                    $"\tWarning: Multiple directories mapped to date: '{result.ToShortDateString()}'. Only '{existingDirectoryName}' is going to be used.");
+                continue;
             }
 
             _dateToExistingDirectoryMapping.Add(result.Date, directoryName);
         }
 
-        using ProgressBar progress = new();
         string[] filePaths = Directory.GetFiles(_sourceDirectory);
         List<MediaFile> mediaFiles = new();
         for (int index = 0; index < filePaths.Length; index++)
@@ -84,12 +83,20 @@ public class MediaFileProcessor
                 mediaFile.RelatedFiles.AddRange(relatedFiles);
                 mediaFiles.Add(mediaFile);
             }
+            else
+            {
+                _ignoredFiles.Add(filePath);
+            }
 
             progress.Report((double)index / filePaths.Length);
         }
 
         progress.Dispose();
         Console.WriteLine("Done.");
+
+        foreach (string stepLog in stepLogs)
+            Console.WriteLine(stepLog);
+
         return mediaFiles;
     }
 
@@ -134,10 +141,12 @@ public class MediaFileProcessor
     {
         if (!_dateToExistingDirectoryMapping.TryGetValue(createdDateTime, out string? directoryName))
         {
-            directoryName  = createdDateTime.ToString("yyyy_MM_dd -");
+            directoryName = createdDateTime.ToString("yyyy_MM_dd -");
         }
 
         string destinationFolderPath = Path.Combine(_sourceDirectory, directoryName);
+        if (filePath.StartsWith(destinationFolderPath)) return;
+
         (FileMovingHelper.MoveStatus status, string? destinationPath) =
             FileMovingHelper.MoveFile(filePath, destinationFolderPath);
         if (status == FileMovingHelper.MoveStatus.Duplicate)
