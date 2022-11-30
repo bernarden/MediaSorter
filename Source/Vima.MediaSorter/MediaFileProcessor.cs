@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Helpers;
 
@@ -107,7 +109,7 @@ public class MediaFileProcessor
         return mediaFiles;
     }
 
-    private void SortMedia(IReadOnlyList<MediaFile> files)
+    private void SortMedia(IReadOnlyCollection<MediaFile> files)
     {
         if (!files.Any())
         {
@@ -117,28 +119,31 @@ public class MediaFileProcessor
 
         Console.Write("Sorting your media... ");
         using ProgressBar progress = new();
-        for (int index = 0; index < files.Count; index++)
-        {
-            MediaFile file = files[index];
-            try
+        int processedFileCounter = 0;
+        Parallel.ForEach(files,
+            new ParallelOptions { MaxDegreeOfParallelism = 25 },
+            file =>
             {
-                DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
-                if (createdDateTime != null)
+                try
                 {
-                    MoveFile(file.FilePath, createdDateTime.Value);
-                    foreach (string filePath in file.RelatedFiles)
+                    DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
+                    if (createdDateTime != null)
                     {
-                        MoveFile(filePath, createdDateTime.Value);
+                        MoveFile(file.FilePath, createdDateTime.Value);
+                        foreach (string filePath in file.RelatedFiles)
+                        {
+                            MoveFile(filePath, createdDateTime.Value);
+                        }
                     }
                 }
-            }
-            catch (Exception)
-            {
-                // ignored
-            }
+                catch (Exception)
+                {
+                    // ignored
+                }
 
-            progress.Report((double)index / files.Count);
-        }
+                Interlocked.Increment(ref processedFileCounter);
+                progress.Report((double)processedFileCounter / files.Count);
+            });
 
         progress.Dispose();
         Console.WriteLine("Done.");
