@@ -4,7 +4,7 @@ namespace Vima.MediaSorter;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static void Main()
     {
         string sourceDirectory = Directory.GetCurrentDirectory();
         MediaFileProcessor processor = new(sourceDirectory);
