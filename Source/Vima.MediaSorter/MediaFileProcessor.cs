@@ -22,8 +22,6 @@ public class MediaFileProcessor(string sourceDirectory)
 
     public void Process()
     {
-        Console.WriteLine("Vima MediaSorter v0.2.0");
-
         List<MediaFile> mediaFiles = IdentifyMediaFiles();
         SortMedia(mediaFiles);
         HandleDuplicatesIfExist();
