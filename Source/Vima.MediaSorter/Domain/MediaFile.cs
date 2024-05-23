@@ -1,23 +1,19 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Vima.MediaSorter.Domain;
 
-public class MediaFile
+public class MediaFile(string filePath, MediaFileType mediaMediaFileType)
 {
-    public enum Type
-    {
-        Image,
-        Video
-    }
+    public string FilePath { get; } = filePath;
+    public MediaFileType MediaMediaFileType { get; } = mediaMediaFileType;
+    public List<string> RelatedFiles { get; } = [];
+    public DateTime? CreatedOn { get; private set; }
+    public CreatedOnSource? CreatedOnSource { get; private set; }
 
-    public Type MediaType { get; }
-    public string FilePath { get; }
-    public List<string> RelatedFiles { get; }
-
-    public MediaFile(string filePath, Type mediaType)
+    public void SetCreatedOn(DateTime? createdOnTime, CreatedOnSource? createdOnSource)
     {
-        FilePath = filePath;
-        MediaType = mediaType;
-        RelatedFiles = [];
+        CreatedOn = createdOnTime;
+        CreatedOnSource = createdOnSource;
     }
 }

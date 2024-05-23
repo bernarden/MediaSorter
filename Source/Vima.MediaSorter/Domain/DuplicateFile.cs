@@ -1,13 +1,7 @@
 ﻿namespace Vima.MediaSorter.Domain;
 
-public class DuplicateFile
+public class DuplicateFile(string originalFilePath, string destinationFilePath)
 {
-    public DuplicateFile(string originalFilePath, string destinationFilePath)
-    {
-        OriginalFilePath = originalFilePath;
-        DestinationFilePath = destinationFilePath;
-    }
-
-    public string OriginalFilePath { get; }
-    public string DestinationFilePath { get; }
+    public string OriginalFilePath { get; } = originalFilePath;
+    public string DestinationFilePath { get; } = destinationFilePath;
 }

@@ -21,7 +21,7 @@ public class DuplicationHelper
         return hash1.SequenceEqual(hash2);
     }
 
-    private static IEnumerable<byte> CalculateFileHash(string filePath)
+    private static byte[] CalculateFileHash(string filePath)
     {
         using FileStream stream = new(filePath, FileMode.Open, FileAccess.Read);
         using HashAlgorithm hashAlgorithm = SHA256.Create();

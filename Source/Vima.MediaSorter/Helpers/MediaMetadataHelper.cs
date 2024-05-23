@@ -8,66 +8,65 @@ using MetadataExtractor.Formats.Exif;
 using MetadataExtractor.Formats.Jpeg;
 using MetadataExtractor.Formats.QuickTime;
 using Vima.MediaSorter.Domain;
+using Directory = MetadataExtractor.Directory;
 
 namespace Vima.MediaSorter.Helpers;
 
-public class MediaMetadataHelper
+public partial class MediaMetadataHelper
 {
-    public static DateTime? GetCreatedDateTime(MediaFile file, TimeSpan utcOffset)
+    public static DateTime? SetCreatedDateTime(MediaFile file)
     {
-        return file.MediaType switch
+        (DateTime? createdOn, CreatedOnSource? createdOnSource) = file.MediaMediaFileType switch
         {
-            MediaFile.Type.Image => GetImageDatetimeCreatedFromMetadata(file.FilePath),
-            MediaFile.Type.Video => GetVideoCreatedDateTimeFromName(file.FilePath, utcOffset),
-            _ => throw new ArgumentOutOfRangeException()
+            MediaFileType.Image => GetImageCreatedOn(file.FilePath),
+            MediaFileType.Video => GetVideoCreatedOn(file.FilePath),
+            _ => throw new ArgumentOutOfRangeException(nameof(file))
         };
+        file.SetCreatedOn(createdOn, createdOnSource);
+        return createdOn;
     }
 
-    public static DateTime? GetImageDatetimeCreatedFromMetadata(string filePath)
+    public static (DateTime?, CreatedOnSource?) GetImageCreatedOn(string filePath)
     {
-        if (TryGetDateTimeFromFileName(filePath, out DateTime? dateTimeFromName))
-            return dateTimeFromName;
+        if (TryGetCreatedOnFromFileName(filePath, out DateTime? dateTimeFromName))
+            return (dateTimeFromName, CreatedOnSource.FileName);
 
         using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
-        IReadOnlyList<MetadataExtractor.Directory> directories =
-            JpegMetadataReader.ReadMetadata(fs, new[] { new ExifReader() });
+        IReadOnlyList<Directory> directories =
+            JpegMetadataReader.ReadMetadata(fs, [new ExifReader()]);
         ExifSubIfdDirectory? subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
-        if (subIfdDirectory == null) return null;
+        if (subIfdDirectory == null) return (null, null);
         if (subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime result))
-        {
-            return result;
-        }
+            return (result, CreatedOnSource.MetadataLocal);
 
-        return null;
+        return (null, null);
     }
 
-    public static DateTime? GetVideoCreatedDateTimeFromName(string filePath, TimeSpan utcOffset)
+    public static (DateTime?, CreatedOnSource?) GetVideoCreatedOn(string filePath)
     {
-        if (TryGetDateTimeFromFileName(filePath, out DateTime? dateTimeFromName))
-            return dateTimeFromName;
+        if (TryGetCreatedOnFromFileName(filePath, out DateTime? dateTimeFromName))
+            return (dateTimeFromName, CreatedOnSource.FileName);
 
         // Try to get creation date from metadata tag.
         using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
-        IReadOnlyList<MetadataExtractor.Directory> directories = QuickTimeMetadataReader.ReadMetadata(fs);
+        IReadOnlyList<Directory> directories = QuickTimeMetadataReader.ReadMetadata(fs);
         QuickTimeMovieHeaderDirectory? subIfdDirectory = directories
             .OfType<QuickTimeMovieHeaderDirectory>()
             .FirstOrDefault();
-        if (subIfdDirectory == null) return null;
+        if (subIfdDirectory == null) return (null, null);
         if (subIfdDirectory.TryGetDateTime(
                 QuickTimeMovieHeaderDirectory.TagCreated, out DateTime tagCreatedUtcResult) &&
             !tagCreatedUtcResult.Equals(new(1904, 01, 01, 0, 0, 0)))
-        {
-            return tagCreatedUtcResult + utcOffset;
-        }
+            return (tagCreatedUtcResult, CreatedOnSource.MetadataUtc);
 
-        return null;
+        return (null, null);
     }
 
-    private static bool TryGetDateTimeFromFileName(string filePath, out DateTime? dateTimeFromName)
+    public static bool TryGetCreatedOnFromFileName(string filePath, out DateTime? createdOn)
     {
         // Try to get creation date from file name.
         string fileName = Path.GetFileName(filePath);
-        Regex rgx = new(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])");
+        Regex rgx = GetCreatedOnFileNameRegex();
         Match mat = rgx.Match(fileName);
         if (mat.Success)
         {
@@ -75,11 +74,14 @@ public class MediaMetadataHelper
             int year = int.Parse(groups["year"].Value);
             int month = int.Parse(groups["month"].Value);
             int day = int.Parse(groups["day"].Value);
-            dateTimeFromName = new DateTime(year, month, day);
+            createdOn = new DateTime(year, month, day);
             return true;
         }
 
-        dateTimeFromName = null;
+        createdOn = null;
         return false;
     }
+
+    [GeneratedRegex(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])")]
+    private static partial Regex GetCreatedOnFileNameRegex();
 }
