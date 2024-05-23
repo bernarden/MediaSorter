@@ -125,7 +125,7 @@ public class MediaFileProcessor(string sourceDirectory)
         {
             TimeSpan utcOffset = ConsoleHelper.GetVideoUtcOffsetFromUser();
             ConsoleKey response = ConsoleHelper.AskYesNoQuestion(
-                "Would you like to rename files to yyyymmdd_hhmmss format?",
+                $"Would you like to rename {mediaFilesToApplyOffset.Count()} file(s) to yyyymmdd_hhmmss format?",
                 ConsoleKey.N);
             shouldRenameFiles = response == ConsoleKey.Y;
             foreach (MediaFile mediaFileToApplyOffset in mediaFilesToApplyOffset)
