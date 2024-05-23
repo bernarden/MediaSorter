@@ -23,7 +23,7 @@ public class ProgressBar : IDisposable, IProgress<double>
 
     public ProgressBar()
     {
-        _timer = new Timer(TimerHandler);
+        _timer = new(TimerHandler);
 
         // A progress bar is only for temporary display in a console window.
         // If the console output is redirected to a file, draw nothing.

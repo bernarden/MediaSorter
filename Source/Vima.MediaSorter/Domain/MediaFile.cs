@@ -18,6 +18,6 @@ public class MediaFile
     {
         FilePath = filePath;
         MediaType = mediaType;
-        RelatedFiles = new List<string>();
+        RelatedFiles = [];
     }
 }

@@ -9,7 +9,7 @@ public class RelatedFilesHelper
 {
     public static IEnumerable<string> FindAll(string filePath)
     {
-        HashSet<string> relatedFiles = new();
+        HashSet<string> relatedFiles = [];
         string fileName = Path.GetFileNameWithoutExtension(filePath);
         string directoryPath = Path.GetDirectoryName(filePath) ?? @"\";
 
