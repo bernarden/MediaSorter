@@ -13,7 +13,7 @@ public class FileMovingHelper
         Duplicate
     }
 
-    public static (MoveStatus, string?) MoveFile(string filePath, string destinationFolderPath)
+    public static (MoveStatus, string?) MoveFile(string filePath, string destinationFolderPath, string destinationFileName)
     {
         if (!PreviouslyCreatedFolders.Contains(destinationFolderPath))
         {
@@ -21,7 +21,7 @@ public class FileMovingHelper
             PreviouslyCreatedFolders.Add(destinationFolderPath);
         }
 
-        string filePathInNewFolder = Path.Combine(destinationFolderPath, Path.GetFileName(filePath));
+        string filePathInNewFolder = Path.Combine(destinationFolderPath, destinationFileName);
         if (File.Exists(filePathInNewFolder))
         {
             if (DuplicationHelper.AreFilesIdentical(filePath, filePathInNewFolder))

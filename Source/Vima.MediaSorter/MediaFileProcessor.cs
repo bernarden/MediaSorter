@@ -118,11 +118,16 @@ public class MediaFileProcessor(string sourceDirectory)
             return;
         }
 
+        bool shouldRenameFiles = false;
         IEnumerable<MediaFile> mediaFilesToApplyOffset = files.Where(x =>
             x.CreatedOnSource == CreatedOnSource.MetadataUtc).ToList();
         if (mediaFilesToApplyOffset.Any())
         {
             TimeSpan utcOffset = ConsoleHelper.GetVideoUtcOffsetFromUser();
+            ConsoleKey response = ConsoleHelper.AskYesNoQuestion(
+                "Would you like to rename files to yyyymmdd_hhmmss format?",
+                ConsoleKey.N);
+            shouldRenameFiles = response == ConsoleKey.Y;
             foreach (MediaFile mediaFileToApplyOffset in mediaFilesToApplyOffset)
             {
                 mediaFileToApplyOffset.SetCreatedOn(
@@ -145,10 +150,11 @@ public class MediaFileProcessor(string sourceDirectory)
                     return;
                 }
 
-                MoveFile(file.FilePath, file.CreatedOn.Value);
+                bool shouldRenameThisFile = shouldRenameFiles && file.CreatedOnSource != CreatedOnSource.FileName;
+                MoveFile(file.FilePath, file.CreatedOn.Value, shouldRenameThisFile);
                 foreach (string filePath in file.RelatedFiles)
                 {
-                    MoveFile(filePath, file.CreatedOn.Value);
+                    MoveFile(filePath, file.CreatedOn.Value, shouldRenameThisFile);
                 }
             }
             catch (Exception)
@@ -171,18 +177,22 @@ public class MediaFileProcessor(string sourceDirectory)
         }
     }
 
-    private void MoveFile(string filePath, DateTime createdDateTime)
+    private void MoveFile(string filePath, DateTime createdDateTime, bool shouldRenameFile)
     {
         if (!_dateToExistingDirectoryMapping.TryGetValue(createdDateTime.Date, out string? directoryName))
         {
             directoryName = createdDateTime.ToString("yyyy_MM_dd -");
         }
 
+        string destinationFileName = shouldRenameFile
+            ? createdDateTime.ToString("yyyyMMdd_HHmmss") + Path.GetExtension(filePath)
+            : Path.GetFileName(filePath);
+
         string destinationFolderPath = Path.Combine(sourceDirectory, directoryName);
         if (filePath.StartsWith(destinationFolderPath)) return;
 
         (FileMovingHelper.MoveStatus status, string? destinationPath) =
-            FileMovingHelper.MoveFile(filePath, destinationFolderPath);
+            FileMovingHelper.MoveFile(filePath, destinationFolderPath, destinationFileName);
         if (status == FileMovingHelper.MoveStatus.Duplicate)
         {
             DuplicateFile duplicateFile = new(filePath, destinationPath ?? string.Empty);
