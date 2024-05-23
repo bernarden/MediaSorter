@@ -47,8 +47,8 @@ public class ProgressBar : IDisposable, IProgress<double>
         {
             if (_disposed) return;
 
-            int progressBlockCount = (int) (_currentProgress * BlockCount);
-            int percent = (int) (_currentProgress * 100);
+            int progressBlockCount = (int)(_currentProgress * BlockCount);
+            int percent = (int)(_currentProgress * 100);
             string text = string.Format("[{0}{1}] {2,3}% {3}",
                 new string('#', progressBlockCount), new string('-', BlockCount - progressBlockCount),
                 percent,
@@ -74,7 +74,7 @@ public class ProgressBar : IDisposable, IProgress<double>
         outputBuilder.Append('\b', _currentText.Length - commonPrefixLength);
 
         // Output new suffix
-        outputBuilder.Append(text.Substring(commonPrefixLength));
+        outputBuilder.Append(text.AsSpan(commonPrefixLength));
 
         // If the new text is shorter than the old one: delete overlapping characters
         int overlapCount = _currentText.Length - text.Length;
@@ -100,5 +100,7 @@ public class ProgressBar : IDisposable, IProgress<double>
             _disposed = true;
             UpdateText(string.Empty);
         }
+
+        GC.SuppressFinalize(this);
     }
 }

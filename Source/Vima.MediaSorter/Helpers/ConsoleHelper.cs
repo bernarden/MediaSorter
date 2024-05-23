@@ -81,8 +81,8 @@ public class ConsoleHelper
             if (signResult != '+' && signResult != '-')
                 throw new ArgumentException("Offset must start with a '+' or '-' sign.");
 
-            if (!int.TryParse(offsetResult.Substring(1, 2), out int hours) ||
-                !int.TryParse(offsetResult.Substring(4, 2), out int minutes))
+            if (!int.TryParse(offsetResult.AsSpan(1, 2), out int hours) ||
+                !int.TryParse(offsetResult.AsSpan(4, 2), out int minutes))
                 throw new ArgumentException("Invalid hours or minutes in offset.");
 
             TimeSpan timeSpan = new(hours, minutes, 0);
@@ -105,7 +105,7 @@ public class ConsoleHelper
             Console.SetCursorPosition(0, Console.CursorTop);
             Console.Write(new string(' ', Console.WindowWidth));
             Console.SetCursorPosition(0, Console.CursorTop);
-            Console.Write($"UTC timezone offset for video files: {offset}");
+            Console.Write($"UTC offset for media files: {offset}");
         }
     }
 }
