@@ -5,7 +5,7 @@ namespace Vima.MediaSorter.Helpers;
 
 public class FileMovingHelper
 {
-    public static readonly HashSet<string> PreviouslyCreatedFolders = new();
+    public static readonly HashSet<string> PreviouslyCreatedFolders = [];
 
     public enum MoveStatus
     {

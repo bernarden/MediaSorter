@@ -13,19 +13,19 @@ namespace Vima.MediaSorter.Helpers;
 
 public class MediaMetadataHelper
 {
-    public static DateTime? GetCreatedDateTime(MediaFile file)
+    public static DateTime? GetCreatedDateTime(MediaFile file, TimeSpan utcOffset)
     {
         return file.MediaType switch
         {
             MediaFile.Type.Image => GetImageDatetimeCreatedFromMetadata(file.FilePath),
-            MediaFile.Type.Video => GetVideoCreatedDateTimeFromName(file.FilePath),
+            MediaFile.Type.Video => GetVideoCreatedDateTimeFromName(file.FilePath, utcOffset),
             _ => throw new ArgumentOutOfRangeException()
         };
     }
 
     public static DateTime? GetImageDatetimeCreatedFromMetadata(string filePath)
     {
-        if (TryGetDateTimeFromName(filePath, out DateTime? dateTimeFromName))
+        if (TryGetDateTimeFromFileName(filePath, out DateTime? dateTimeFromName))
             return dateTimeFromName;
 
         using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
@@ -41,9 +41,9 @@ public class MediaMetadataHelper
         return null;
     }
 
-    public static DateTime? GetVideoCreatedDateTimeFromName(string filePath)
+    public static DateTime? GetVideoCreatedDateTimeFromName(string filePath, TimeSpan utcOffset)
     {
-        if (TryGetDateTimeFromName(filePath, out DateTime? dateTimeFromName))
+        if (TryGetDateTimeFromFileName(filePath, out DateTime? dateTimeFromName))
             return dateTimeFromName;
 
         // Try to get creation date from metadata tag.
@@ -55,15 +55,15 @@ public class MediaMetadataHelper
         if (subIfdDirectory == null) return null;
         if (subIfdDirectory.TryGetDateTime(
                 QuickTimeMovieHeaderDirectory.TagCreated, out DateTime tagCreatedUtcResult) &&
-            !tagCreatedUtcResult.Equals(new DateTime(1904, 01, 01, 0, 0, 0)))
+            !tagCreatedUtcResult.Equals(new(1904, 01, 01, 0, 0, 0)))
         {
-            return tagCreatedUtcResult.ToLocalTime();
+            return tagCreatedUtcResult + utcOffset;
         }
 
         return null;
     }
 
-    private static bool TryGetDateTimeFromName(string filePath, out DateTime? dateTimeFromName)
+    private static bool TryGetDateTimeFromFileName(string filePath, out DateTime? dateTimeFromName)
     {
         // Try to get creation date from file name.
         string fileName = Path.GetFileName(filePath);
@@ -75,10 +75,8 @@ public class MediaMetadataHelper
             int year = int.Parse(groups["year"].Value);
             int month = int.Parse(groups["month"].Value);
             int day = int.Parse(groups["day"].Value);
-            {
-                dateTimeFromName = new DateTime(year, month, day);
-                return true;
-            }
+            dateTimeFromName = new DateTime(year, month, day);
+            return true;
         }
 
         dateTimeFromName = null;

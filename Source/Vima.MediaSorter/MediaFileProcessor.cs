@@ -13,12 +13,12 @@ namespace Vima.MediaSorter;
 public class MediaFileProcessor
 {
     public static readonly string FolderNameFormat = "yyyy_MM_dd -";
-    public static readonly List<string> ImageExtensions = new() { ".JPG", ".JPEG" };
-    public static readonly List<string> VideoExtensions = new() { ".MP4" };
-    private readonly IList<DuplicateFile> _duplicateFiles;
-    private readonly string _sourceDirectory;
+    public static readonly List<string> ImageExtensions = [".JPG", ".JPEG"];
+    public static readonly List<string> VideoExtensions = [".MP4"];
     private readonly Dictionary<DateTime, string> _dateToExistingDirectoryMapping = new();
-    private readonly List<string> _ignoredFiles = new();
+    private readonly IList<DuplicateFile> _duplicateFiles;
+    private readonly List<string> _ignoredFiles = [];
+    private readonly string _sourceDirectory;
 
     public MediaFileProcessor(string sourceDirectory)
     {
@@ -28,8 +28,10 @@ public class MediaFileProcessor
 
     public void Process()
     {
+        TimeSpan utcOffset = ConsoleHelper.GetVideoUtcOffsetFromUser();
+
         List<MediaFile> mediaFiles = IdentifyMediaFiles();
-        SortMedia(mediaFiles);
+        SortMedia(mediaFiles, utcOffset);
         HandleDuplicatesIfExist();
 
         Console.WriteLine("Press enter to finish...");
@@ -40,7 +42,7 @@ public class MediaFileProcessor
     {
         Console.Write("Identifying your media... ");
         using ProgressBar progress = new();
-        List<string> stepLogs = new();
+        List<string> stepLogs = [];
 
         // Find previously used media directories.
         string[] directoryPaths = Directory.GetDirectories(_sourceDirectory);
@@ -71,19 +73,19 @@ public class MediaFileProcessor
 
         // Get all file paths from source and children directories.
         IEnumerable<string> directoriesToScan = new List<string> { _sourceDirectory }.Concat(directoryPaths);
-        List<string> filePaths = new();
+        List<string> filePaths = [];
         foreach (string directoryToScan in directoriesToScan)
         {
             filePaths.AddRange(Directory.GetFiles(directoryToScan));
         }
 
-        List<MediaFile> mediaFiles = new();
+        List<MediaFile> mediaFiles = [];
         for (int index = 0; index < filePaths.Count; index++)
         {
             string filePath = filePaths[index];
             if (ImageExtensions.Contains(Path.GetExtension(filePath).ToUpperInvariant()))
             {
-                mediaFiles.Add(new MediaFile(filePath, MediaFile.Type.Image));
+                mediaFiles.Add(new(filePath, MediaFile.Type.Image));
             }
             else if (VideoExtensions.Contains(Path.GetExtension(filePath).ToUpperInvariant()))
             {
@@ -109,7 +111,7 @@ public class MediaFileProcessor
         return mediaFiles;
     }
 
-    private void SortMedia(IReadOnlyCollection<MediaFile> files)
+    private void SortMedia(IReadOnlyCollection<MediaFile> files, TimeSpan utcOffset)
     {
         if (!files.Any())
         {
@@ -119,37 +121,35 @@ public class MediaFileProcessor
 
         Console.Write("Sorting your media... ");
         using ProgressBar progress = new();
-        List<string> stepLogs = new();
+        List<string> stepLogs = [];
         int processedFileCounter = 0;
-        Parallel.ForEach(files,
-            new ParallelOptions { MaxDegreeOfParallelism = 25 },
-            file =>
+        Parallel.ForEach(files, new() { MaxDegreeOfParallelism = 25 }, file =>
+        {
+            try
             {
-                try
+                DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file, utcOffset);
+                if (createdDateTime != null)
                 {
-                    DateTime? createdDateTime = MediaMetadataHelper.GetCreatedDateTime(file);
-                    if (createdDateTime != null)
+                    MoveFile(file.FilePath, createdDateTime.Value);
+                    foreach (string filePath in file.RelatedFiles)
                     {
-                        MoveFile(file.FilePath, createdDateTime.Value);
-                        foreach (string filePath in file.RelatedFiles)
-                        {
-                            MoveFile(filePath, createdDateTime.Value);
-                        }
-                    }
-                    else
-                    {
-                        stepLogs.Add($"\tWarning: No creation date detected: {file.FilePath}");
+                        MoveFile(filePath, createdDateTime.Value);
                     }
                 }
-                catch (Exception)
+                else
                 {
-                    // ignored
-                    stepLogs.Add($"\tWarning: Failed to sort: {file.FilePath}");
+                    stepLogs.Add($"\tWarning: No creation date detected: {file.FilePath}");
                 }
+            }
+            catch (Exception)
+            {
+                // ignored
+                stepLogs.Add($"\tWarning: Failed to sort: {file.FilePath}");
+            }
 
-                Interlocked.Increment(ref processedFileCounter);
-                progress.Report((double)processedFileCounter / files.Count);
-            });
+            Interlocked.Increment(ref processedFileCounter);
+            progress.Report((double)processedFileCounter / files.Count);
+        });
 
         progress.Dispose();
         Console.WriteLine("Done.");
