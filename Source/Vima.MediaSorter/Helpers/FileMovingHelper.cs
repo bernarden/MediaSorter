@@ -13,7 +13,8 @@ public class FileMovingHelper
         Duplicate
     }
 
-    public static (MoveStatus, string?) MoveFile(string filePath, string destinationFolderPath, string destinationFileName)
+    public static (MoveStatus, string?) MoveFile(
+        string filePath, string destinationFolderPath, string destinationFileName)
     {
         if (!PreviouslyCreatedFolders.Contains(destinationFolderPath))
         {
@@ -29,21 +30,23 @@ public class FileMovingHelper
                 return (MoveStatus.Duplicate, filePathInNewFolder);
             }
 
-            filePathInNewFolder = GenerateUniqueName(filePath, destinationFolderPath);
+            filePathInNewFolder = GenerateUniqueName(destinationFolderPath, destinationFileName);
         }
 
         File.Move(filePath, filePathInNewFolder);
         return (MoveStatus.Success, null);
     }
 
-    private static string GenerateUniqueName(string filePath, string newFolderPath)
+    private static string GenerateUniqueName(string newFolderPath, string destinationFileName)
     {
+        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(destinationFileName);
+        string extension = Path.GetExtension(destinationFileName).ToLowerInvariant();
+
         string filePathInNewFolder;
         int count = 1;
         do
         {
-            string fileName =
-                $"{Path.GetFileNameWithoutExtension(filePath)} ({count}){Path.GetExtension(filePath)}";
+            string fileName = $"{fileNameWithoutExtension} ({count}){extension}";
             filePathInNewFolder = Path.Combine(newFolderPath, fileName);
             count++;
         } while (File.Exists(filePathInNewFolder));

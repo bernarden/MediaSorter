@@ -14,8 +14,8 @@ namespace Vima.MediaSorter;
 public class MediaFileProcessor(string sourceDirectory)
 {
     public static readonly string FolderNameFormat = "yyyy_MM_dd -";
-    public static readonly List<string> ImageExtensions = [".JPG", ".JPEG"];
-    public static readonly List<string> VideoExtensions = [".MP4"];
+    public static readonly List<string> ImageExtensions = [".jpg", ".jpeg"];
+    public static readonly List<string> VideoExtensions = [".mp4"];
     private readonly Dictionary<DateTime, string> _dateToExistingDirectoryMapping = [];
     private readonly List<DuplicateFile> _duplicateFiles = [];
     private readonly List<string> _ignoredFiles = [];
@@ -75,13 +75,13 @@ public class MediaFileProcessor(string sourceDirectory)
         int processedFileCounter = 0;
         Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
         {
-            if (ImageExtensions.Contains(Path.GetExtension(filePath).ToUpperInvariant()))
+            if (ImageExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant()))
             {
                 MediaFile mediaFile = new(filePath, MediaFileType.Image);
                 MediaMetadataHelper.SetCreatedDateTime(mediaFile);
                 mediaFiles.Add(mediaFile);
             }
-            else if (VideoExtensions.Contains(Path.GetExtension(filePath).ToUpperInvariant()))
+            else if (VideoExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant()))
             {
                 MediaFile mediaFile = new(filePath, MediaFileType.Video);
                 IEnumerable<string> relatedFiles = RelatedFilesHelper.FindAll(filePath);
@@ -185,11 +185,11 @@ public class MediaFileProcessor(string sourceDirectory)
         }
 
         string destinationFileName = shouldRenameFile
-            ? createdDateTime.ToString("yyyyMMdd_HHmmss") + Path.GetExtension(filePath)
+            ? createdDateTime.ToString("yyyyMMdd_HHmmss") + Path.GetExtension(filePath).ToLowerInvariant()
             : Path.GetFileName(filePath);
 
         string destinationFolderPath = Path.Combine(sourceDirectory, directoryName);
-        if (filePath.StartsWith(destinationFolderPath)) return;
+        if (filePath.StartsWith(destinationFolderPath) && !shouldRenameFile) return;
 
         (FileMovingHelper.MoveStatus status, string? destinationPath) =
             FileMovingHelper.MoveFile(filePath, destinationFolderPath, destinationFileName);
