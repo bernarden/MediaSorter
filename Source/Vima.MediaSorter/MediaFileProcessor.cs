@@ -41,26 +41,17 @@ public class MediaFileProcessor(string sourceDirectory)
         foreach (string directoryPath in directoryPaths)
         {
             string directoryName = new DirectoryInfo(directoryPath).Name;
-            if (directoryName.Length < FolderNameFormat.Length)
-            {
-                continue;
-            }
+            DateTime? directoryDate = GetDirectoryDateFromPath(directoryName);
+            if (directoryDate == null) continue;
 
-            string directoryNameBeginning = directoryName[..FolderNameFormat.Length];
-            if (!DateTime.TryParseExact(directoryNameBeginning, FolderNameFormat,
-                    CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result))
-            {
-                continue;
-            }
-
-            if (_dateToExistingDirectoryMapping.TryGetValue(result.Date, out string? existingDirectoryName))
+            if (_dateToExistingDirectoryMapping.TryGetValue(directoryDate.Value.Date, out string? existingDirectoryName))
             {
                 stepLogs.Add(
-                    $"\tWarning: Multiple directories mapped to date: '{result.ToShortDateString()}'. Only '{existingDirectoryName}' is going to be used.");
+                    $"\tWarning: Multiple directories mapped to date: '{directoryDate.Value.ToShortDateString()}'. Only '{existingDirectoryName}' is going to be used.");
                 continue;
             }
 
-            _dateToExistingDirectoryMapping.Add(result.Date, directoryName);
+            _dateToExistingDirectoryMapping.Add(directoryDate.Value.Date, directoryName);
         }
 
         // Get all file paths from source and children directories.
@@ -191,6 +182,10 @@ public class MediaFileProcessor(string sourceDirectory)
         string destinationFolderPath = Path.Combine(sourceDirectory, directoryName);
         if (filePath.StartsWith(destinationFolderPath) && !shouldRenameFile) return;
 
+        // Don't move files that have been previously (manually?) put into a dated folder.
+        string? currentParentDirectoryName = new DirectoryInfo(filePath).Parent?.Name;
+        if (currentParentDirectoryName != null && GetDirectoryDateFromPath(currentParentDirectoryName) != null) return;
+
         (FileMovingHelper.MoveStatus status, string? destinationPath) =
             FileMovingHelper.MoveFile(filePath, destinationFolderPath, destinationFileName);
         if (status == FileMovingHelper.MoveStatus.Duplicate)
@@ -219,5 +214,16 @@ public class MediaFileProcessor(string sourceDirectory)
 
         progress.Dispose();
         Console.WriteLine("Done.");
+    }
+
+    private static DateTime? GetDirectoryDateFromPath(string directoryName)
+    {
+        if (directoryName.Length < FolderNameFormat.Length) return null;
+
+        string directoryNameBeginning = directoryName[..FolderNameFormat.Length];
+        return DateTime.TryParseExact(directoryNameBeginning, FolderNameFormat,
+            CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result)
+            ? result
+            : null;
     }
 }
