@@ -11,7 +11,7 @@ using Vima.MediaSorter.Helpers;
 
 namespace Vima.MediaSorter;
 
-public class MediaFileProcessor(string sourceDirectory)
+public class MediaFileProcessor(MediaSorterSettings settings)
 {
     public static readonly string FolderNameFormat = "yyyy_MM_dd -";
     public static readonly List<string> ImageExtensions = [".jpg", ".jpeg"];
@@ -37,7 +37,7 @@ public class MediaFileProcessor(string sourceDirectory)
         ConcurrentBag<string> stepLogs = [];
 
         // Find previously used media directories.
-        string[] directoryPaths = Directory.GetDirectories(sourceDirectory);
+        string[] directoryPaths = Directory.GetDirectories(settings.Directory);
         foreach (string directoryPath in directoryPaths)
         {
             string directoryName = new DirectoryInfo(directoryPath).Name;
@@ -55,7 +55,7 @@ public class MediaFileProcessor(string sourceDirectory)
         }
 
         // Get all file paths from source and children directories.
-        IEnumerable<string> directoriesToScan = new List<string> { sourceDirectory }.Concat(directoryPaths);
+        IEnumerable<string> directoriesToScan = new List<string> { settings.Directory }.Concat(directoryPaths);
         List<string> filePaths = [];
         foreach (string directoryToScan in directoriesToScan)
         {
@@ -179,7 +179,7 @@ public class MediaFileProcessor(string sourceDirectory)
             ? createdDateTime.ToString("yyyyMMdd_HHmmss") + Path.GetExtension(filePath).ToLowerInvariant()
             : Path.GetFileName(filePath);
 
-        string destinationFolderPath = Path.Combine(sourceDirectory, directoryName);
+        string destinationFolderPath = Path.Combine(settings.Directory, directoryName);
         if (filePath.StartsWith(destinationFolderPath) && !shouldRenameFile) return;
 
         // Don't move files that have been previously (manually?) put into a dated folder.
