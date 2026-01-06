@@ -14,27 +14,19 @@ public class Program
         {
             Description = "The directory to process. Defaults to the executable's launch directory."
         };
-        Option<bool> simulateOption = new("--simulate")
-        {
-            Description = "If true, only simulate the process without actual file operations."
-        };
 
         RootCommand rootCommand = new("Sorts media files into organised folders.");
         rootCommand.Add(directoryOption);
-        rootCommand.Add(simulateOption);
-        rootCommand.SetAction(parseResult => RunMediaSorter(
-            parseResult.GetValue(directoryOption),
-            parseResult.GetValue(simulateOption))
-        );
+        rootCommand.SetAction(parseResult => RunMediaSorter(parseResult.GetValue(directoryOption)));
 
         ParseResult parseResult = rootCommand.Parse(args);
         return parseResult.Invoke();
     }
 
-    private static int RunMediaSorter(string? directory, bool simulate)
+    private static int RunMediaSorter(string? directory)
     {
         string directoryPath = string.IsNullOrWhiteSpace(directory) ? Directory.GetCurrentDirectory() : directory;
-        MediaSorterSettings settings = new() { Directory = directoryPath, SimulateMode = simulate };
+        MediaSorterSettings settings = new() { Directory = directoryPath };
 
         try
         {
