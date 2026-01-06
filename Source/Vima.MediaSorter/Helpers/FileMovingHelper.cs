@@ -1,11 +1,15 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
+using System.Threading;
 
 namespace Vima.MediaSorter.Helpers;
 
 public class FileMovingHelper
 {
-    public static readonly HashSet<string> PreviouslyCreatedFolders = [];
+    private static readonly ConcurrentDictionary<string, byte> PreviouslyCreatedFolders = new();
+    private static readonly object[] Locks = [.. Enumerable.Range(0, 32).Select(_ => new object())];
 
     public enum MoveStatus
     {
@@ -16,11 +20,7 @@ public class FileMovingHelper
     public static (MoveStatus, string?) MoveFile(
         string filePath, string destinationFolderPath, string destinationFileName)
     {
-        if (!PreviouslyCreatedFolders.Contains(destinationFolderPath))
-        {
-            Directory.CreateDirectory(destinationFolderPath);
-            PreviouslyCreatedFolders.Add(destinationFolderPath);
-        }
+        EnsureFolderExists(destinationFolderPath);
 
         string filePathInNewFolder = Path.Combine(destinationFolderPath, destinationFileName);
         if (File.Exists(filePathInNewFolder))
@@ -33,10 +33,41 @@ public class FileMovingHelper
             filePathInNewFolder = GenerateUniqueName(destinationFolderPath, destinationFileName);
         }
 
-        File.Move(filePath, filePathInNewFolder);
+        const int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; ++attempt)
+        {
+            try
+            {
+                File.Move(filePath, filePathInNewFolder);
+                break;
+            }
+            catch (Exception ex) when (
+                (ex is IOException ||
+                ex is UnauthorizedAccessException ||
+                ex is DirectoryNotFoundException) &&
+                attempt < maxAttempts)
+            {
+                Thread.Sleep(150 * attempt);
+            }
+        }
+
         return (MoveStatus.Success, null);
     }
 
+
+    private static void EnsureFolderExists(string path)
+    {
+        if (PreviouslyCreatedFolders.ContainsKey(path)) return;
+
+        int lockIndex = (path.GetHashCode() & 0x7FFFFFFF) % Locks.Length;
+        lock (Locks[lockIndex])
+        {
+            if (PreviouslyCreatedFolders.ContainsKey(path)) return;
+
+            Directory.CreateDirectory(path);
+            PreviouslyCreatedFolders.TryAdd(path, 0);
+        }
+    }
     private static string GenerateUniqueName(string newFolderPath, string destinationFileName)
     {
         string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(destinationFileName);
