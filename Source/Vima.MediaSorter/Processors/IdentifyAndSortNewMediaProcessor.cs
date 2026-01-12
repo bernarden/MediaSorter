@@ -1,29 +1,21 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Helpers;
 using Vima.MediaSorter.Services;
 
-namespace Vima.MediaSorter;
+namespace Vima.MediaSorter.Processors;
 
-public class MediaFileProcessor
+public class IdentifyAndSortNewMediaProcessor(MediaSorterSettings settings) : IProcessor
 {
-    public static readonly string FolderNameFormat = "yyyy_MM_dd -";
-    public static readonly List<string> ImageExtensions = new() { ".jpg", ".jpeg" };
-    public static readonly List<string> VideoExtensions = new() { ".mp4" };
-
-    private readonly MediaSorterSettings _settings;
-
-    public MediaFileProcessor(MediaSorterSettings settings)
-    {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-    }
-
     public void Process()
     {
-        var identifier = new MediaIdentifingService(_settings);
-        var result = identifier.Identify();
+        var directoryIdentifier = new DirectoryIdentifingService(settings);
+        var directoryStructure = directoryIdentifier.IdentifyDirectoryStructure();
+
+        var identifier = new MediaIdentifingService(settings);
+        var result = identifier.Identify(directoryStructure);
         if (result.MediaFiles.Count == 0)
         {
             Console.WriteLine("No media files found. Exiting.");
@@ -34,8 +26,8 @@ public class MediaFileProcessor
         ConsoleKey proceed = ConsoleHelper.AskYesNoQuestion("Proceed to sort these files?", ConsoleKey.N);
         if (proceed != ConsoleKey.Y) return;
 
-        var sortingService = new MediaSortingService(_settings, result.ExistingDirectoryMapping);
-        List<DuplicateFile> duplicates = sortingService.Sort(result.MediaFiles);
+        var sortingService = new MediaSortingService(settings);
+        List<DuplicateFile> duplicates = sortingService.Sort(result.MediaFiles, directoryStructure.DateToExistingDirectoryMapping);
 
         if (duplicates.Count > 0)
         {
