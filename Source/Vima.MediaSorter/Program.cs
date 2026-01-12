@@ -3,6 +3,8 @@ using System.CommandLine;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Processors;
 
 namespace Vima.MediaSorter;
 
@@ -35,8 +37,7 @@ public class Program
             Console.WriteLine($"Vima MediaSorter v{fileVersionInfo.FileVersion}");
 
             Console.WriteLine($"Processing files in: {settings.Directory}");
-            MediaFileProcessor processor = new(settings);
-            processor.Process();
+            new IdentifyAndSortNewMediaProcessor(settings).Process();
             return 0;
         }
         catch (ArgumentException ex)

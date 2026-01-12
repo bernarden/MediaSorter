@@ -10,41 +10,16 @@ using Vima.MediaSorter.Helpers;
 
 namespace Vima.MediaSorter.Services;
 
-public class MediaIdentifingService
+public class MediaIdentifingService(MediaSorterSettings settings)
 {
-    private readonly MediaSorterSettings _settings;
-
-    public MediaIdentifingService(MediaSorterSettings settings)
-    {
-        _settings = settings;
-    }
-
-    public MediaIdentificationResult Identify()
+    public MediaIdentificationResult Identify(DirectoryStructure directoryStructure)
     {
         Console.Write("Identifying your media... ");
         using ProgressBar progress = new();
         ConcurrentBag<string> stepLogs = new();
 
-        var dateToExistingDirectoryMapping = new Dictionary<DateTime, string>();
-        string[] directoryPaths = Directory.GetDirectories(_settings.Directory);
-        foreach (string directoryPath in directoryPaths)
-        {
-            string directoryName = new DirectoryInfo(directoryPath).Name;
-            DateTime? directoryDate = GetDirectoryDateFromPath(directoryName);
-            if (directoryDate == null) continue;
-
-            if (dateToExistingDirectoryMapping.TryGetValue(directoryDate.Value.Date, out string? existingDirectoryName))
-            {
-                stepLogs.Add(
-                    $"\tWarning: Multiple directories mapped to date: '{directoryDate.Value.ToShortDateString()}'. Only '{existingDirectoryName}' is going to be used.");
-                continue;
-            }
-
-            dateToExistingDirectoryMapping.Add(directoryDate.Value.Date, directoryName);
-        }
-
         // Get all file paths from source and children directories.
-        IEnumerable<string> directoriesToScan = new List<string> { _settings.Directory }.Concat(directoryPaths);
+        IEnumerable<string> directoriesToScan = new List<string> { settings.Directory }.Concat(directoryStructure.UnsortedFolders);
         List<string> filePaths = new();
         foreach (string directoryToScan in directoriesToScan)
         {
@@ -57,13 +32,13 @@ public class MediaIdentifingService
         Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
         {
             string ext = Path.GetExtension(filePath).ToLowerInvariant();
-            if (MediaFileProcessor.ImageExtensions.Contains(ext))
+            if (settings.ImageExtensions.Contains(ext))
             {
                 MediaFile mediaFile = new(filePath, MediaFileType.Image);
                 MediaMetadataHelper.SetCreatedDateTime(mediaFile);
                 mediaFiles.Add(mediaFile);
             }
-            else if (MediaFileProcessor.VideoExtensions.Contains(ext))
+            else if (settings.VideoExtensions.Contains(ext))
             {
                 MediaFile mediaFile = new(filePath, MediaFileType.Video);
                 IEnumerable<string> relatedFiles = RelatedFilesHelper.FindAll(filePath);
@@ -89,19 +64,7 @@ public class MediaIdentifingService
         return new MediaIdentificationResult
         {
             MediaFiles = [.. mediaFiles],
-            ExistingDirectoryMapping = dateToExistingDirectoryMapping,
             IgnoredFiles = ignoredFiles
         };
-    }
-
-    private static DateTime? GetDirectoryDateFromPath(string directoryName)
-    {
-        if (directoryName.Length < MediaFileProcessor.FolderNameFormat.Length) return null;
-
-        string directoryNameBeginning = directoryName[..MediaFileProcessor.FolderNameFormat.Length];
-        return DateTime.TryParseExact(directoryNameBeginning, MediaFileProcessor.FolderNameFormat,
-            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime result)
-            ? result
-            : null;
     }
 }

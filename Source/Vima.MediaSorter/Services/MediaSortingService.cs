@@ -11,20 +11,9 @@ using Vima.MediaSorter.Helpers;
 
 namespace Vima.MediaSorter.Services;
 
-public class MediaSortingService
+public class MediaSortingService(MediaSorterSettings settings)
 {
-    private readonly MediaSorterSettings _settings;
-    private readonly Dictionary<DateTime, string> _dateToExistingDirectoryMapping;
-
-    public MediaSortingService(MediaSorterSettings settings, IReadOnlyDictionary<DateTime, string>? existingDirectoryMapping = null)
-    {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _dateToExistingDirectoryMapping = existingDirectoryMapping != null
-            ? new Dictionary<DateTime, string>(existingDirectoryMapping)
-            : new Dictionary<DateTime, string>();
-    }
-
-    public List<DuplicateFile> Sort(IReadOnlyCollection<MediaFile> files)
+    public List<DuplicateFile> Sort(IReadOnlyCollection<MediaFile> files, IDictionary<DateTime, string> dateToExistingDirectoryMapping)
     {
         var duplicates = new ConcurrentBag<DuplicateFile>();
         if (files == null || files.Count == 0) return duplicates.ToList();
@@ -59,11 +48,11 @@ public class MediaSortingService
                 }
 
                 bool shouldRenameThisFile = shouldRenameFiles && file.CreatedOnSource != CreatedOnSource.FileName;
-                MoveFile(file.FilePath, file.CreatedOn.Value, shouldRenameThisFile, duplicates);
+                MoveFile(file.FilePath, file.CreatedOn.Value, shouldRenameThisFile, dateToExistingDirectoryMapping, duplicates);
 
                 foreach (string related in file.RelatedFiles)
                 {
-                    MoveFile(related, file.CreatedOn.Value, shouldRenameThisFile, duplicates);
+                    MoveFile(related, file.CreatedOn.Value, shouldRenameThisFile, dateToExistingDirectoryMapping, duplicates);
                 }
             }
             catch (Exception e)
@@ -82,18 +71,18 @@ public class MediaSortingService
         return [.. duplicates];
     }
 
-    private void MoveFile(string filePath, DateTime createdDateTime, bool shouldRenameFile, ConcurrentBag<DuplicateFile> duplicates)
+    private void MoveFile(string filePath, DateTime createdDateTime, bool shouldRenameFile, IDictionary<DateTime, string> dateToExistingDirectoryMapping, ConcurrentBag<DuplicateFile> duplicates)
     {
-        if (!_dateToExistingDirectoryMapping.TryGetValue(createdDateTime.Date, out string? directoryName))
+        if (!dateToExistingDirectoryMapping.TryGetValue(createdDateTime.Date, out string? directoryName))
         {
-            directoryName = createdDateTime.ToString(MediaFileProcessor.FolderNameFormat, CultureInfo.InvariantCulture);
+            directoryName = createdDateTime.ToString(settings.FolderNameFormat, CultureInfo.InvariantCulture);
         }
 
         string destinationFileName = shouldRenameFile
             ? createdDateTime.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + Path.GetExtension(filePath).ToLowerInvariant()
             : Path.GetFileName(filePath);
 
-        string destinationFolderPath = Path.Combine(_settings.Directory, directoryName);
+        string destinationFolderPath = Path.Combine(settings.Directory, directoryName);
         if (filePath.StartsWith(destinationFolderPath, StringComparison.OrdinalIgnoreCase) && !shouldRenameFile) return;
 
         // Don't move files that have been previously (manually?) put into a dated folder.
@@ -109,12 +98,12 @@ public class MediaSortingService
         }
     }
 
-    private static DateTime? GetDirectoryDateFromPath(string directoryName)
+    private DateTime? GetDirectoryDateFromPath(string directoryName)
     {
-        if (directoryName.Length < MediaFileProcessor.FolderNameFormat.Length) return null;
+        if (directoryName.Length < settings.FolderNameFormat.Length) return null;
 
-        string directoryNameBeginning = directoryName.Substring(0, MediaFileProcessor.FolderNameFormat.Length);
-        return DateTime.TryParseExact(directoryNameBeginning, MediaFileProcessor.FolderNameFormat,
+        string directoryNameBeginning = directoryName.Substring(0, settings.FolderNameFormat.Length);
+        return DateTime.TryParseExact(directoryNameBeginning, settings.FolderNameFormat,
             CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result)
             ? result
             : null;
