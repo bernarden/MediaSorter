@@ -18,7 +18,7 @@ public class IdentifyAndSortNewMediaProcessor(MediaSorterSettings settings) : IP
         var result = identifier.Identify(directoryStructure);
         if (result.MediaFiles.Count == 0)
         {
-            Console.WriteLine("No media files found. Exiting.");
+            Console.WriteLine("No media files found.");
             return;
         }
 
@@ -48,8 +48,5 @@ public class IdentifyAndSortNewMediaProcessor(MediaSorterSettings settings) : IP
                 Console.WriteLine("Done.");
             }
         }
-
-        Console.WriteLine("Press enter to finish...");
-        Console.ReadLine();
     }
 }
