@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using Vima.MediaSorter.Domain;
 
@@ -11,7 +12,7 @@ public class DirectoryIdentifingService(MediaSorterSettings settings)
     {
         Console.Write("Identifying directory structure... ");
         using ProgressBar progress = new();
-        ConcurrentBag<string> stepLogs = new();
+        ConcurrentDictionary<DateTime, ConcurrentBag<string>> ignoredFolderForDate = new();
 
         int counter = 0;
         DirectoryStructure result = new();
@@ -32,8 +33,8 @@ public class DirectoryIdentifingService(MediaSorterSettings settings)
                 DateTime date = directoryDate.Value.Date;
                 if (result.DateToExistingDirectoryMapping.TryGetValue(date, out string? existingDirectoryPath))
                 {
-                    stepLogs.Add(
-                        $"\tWarning: Multiple directories mapped to date: '{date:d}'. Only '{new DirectoryInfo(existingDirectoryPath).Name}' is going to be used.");
+                    var ignoredFolders = ignoredFolderForDate.GetOrAdd(date, _ => new ConcurrentBag<string>());
+                    ignoredFolders.Add(directoryName);
                 }
                 else
                 {
@@ -48,8 +49,20 @@ public class DirectoryIdentifingService(MediaSorterSettings settings)
         progress.Dispose();
         Console.WriteLine("Done.");
 
-        foreach (string stepLog in stepLogs)
-            Console.WriteLine(stepLog);
+        if (!ignoredFolderForDate.IsEmpty)
+        {
+            Console.WriteLine("  Warning: Multiple directories mapped to the same dates (Only first discovery used):");
+            foreach (var ignoredFolders in ignoredFolderForDate.OrderBy(x => x.Key))
+            {
+                string usedDirName = Path.GetFileName(result.DateToExistingDirectoryMapping[ignoredFolders.Key]);
+                Console.WriteLine($"    [{ignoredFolders.Key:yyyy_MM_dd}] Target: '{usedDirName}'");
+                foreach (var ignoredFolder in ignoredFolders.Value)
+                {
+                    Console.WriteLine($"                 Ignore: '{ignoredFolder}'");
+                }
+            }
+            Console.WriteLine();
+        }
 
         return result;
     }
