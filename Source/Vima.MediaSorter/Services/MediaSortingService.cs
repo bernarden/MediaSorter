@@ -19,7 +19,7 @@ public class MediaSortingService(MediaSorterSettings settings)
         if (files == null || files.Count == 0) return duplicates.ToList();
 
         bool shouldRenameFiles = false;
-        var mediaFilesToApplyOffset = files.Where(x => x.CreatedOnSource == CreatedOnSource.MetadataUtc).ToList();
+        var mediaFilesToApplyOffset = files.Where(x => x.CreatedOn != null && x.CreatedOn.Source == CreatedOnSource.MetadataUtc).ToList();
         if (mediaFilesToApplyOffset.Any())
         {
             TimeSpan utcOffset = ConsoleHelper.GetVideoUtcOffsetFromUser();
@@ -29,7 +29,7 @@ public class MediaSortingService(MediaSorterSettings settings)
             shouldRenameFiles = response == ConsoleKey.Y;
             foreach (var mf in mediaFilesToApplyOffset)
             {
-                mf.SetCreatedOn(mf.CreatedOn + utcOffset, CreatedOnSource.MetadataLocal);
+                mf.SetCreatedOn(new CreatedOn(mf.CreatedOn!.Date + utcOffset, CreatedOnSource.MetadataLocal));
             }
         }
 
@@ -47,12 +47,12 @@ public class MediaSortingService(MediaSorterSettings settings)
                     return;
                 }
 
-                bool shouldRenameThisFile = shouldRenameFiles && file.CreatedOnSource != CreatedOnSource.FileName;
-                MoveFile(file.FilePath, file.CreatedOn.Value, shouldRenameThisFile, dateToExistingDirectoryMapping, duplicates);
+                bool shouldRenameThisFile = shouldRenameFiles && file.CreatedOn.Source != CreatedOnSource.FileName;
+                MoveFile(file.FilePath, file.CreatedOn.Date, shouldRenameThisFile, dateToExistingDirectoryMapping, duplicates);
 
                 foreach (string related in file.RelatedFiles)
                 {
-                    MoveFile(related, file.CreatedOn.Value, shouldRenameThisFile, dateToExistingDirectoryMapping, duplicates);
+                    MoveFile(related, file.CreatedOn.Date, shouldRenameThisFile, dateToExistingDirectoryMapping, duplicates);
                 }
             }
             catch (Exception e)
