@@ -10,21 +10,17 @@ using Vima.MediaSorter.Helpers;
 
 namespace Vima.MediaSorter.Services;
 
-public class MediaIdentifingService(MediaSorterSettings settings)
+public class MediaIdentifyingService(MediaSorterSettings settings)
 {
-    public MediaIdentificationResult Identify(DirectoryStructure directoryStructure)
+    public IdentifiedMedia Identify(IEnumerable<string> directoriesToScan)
     {
         Console.Write("Identifying your media... ");
         using ProgressBar progress = new();
         ConcurrentBag<string> stepLogs = new();
 
-        // Get all file paths from source and children directories.
-        IEnumerable<string> directoriesToScan = new List<string> { settings.Directory }.Concat(directoryStructure.UnsortedFolders);
-        List<string> filePaths = new();
-        foreach (string directoryToScan in directoriesToScan)
-        {
-            filePaths.AddRange(Directory.GetFiles(directoryToScan));
-        }
+        List<string> filePaths = directoriesToScan
+            .SelectMany(d => Directory.EnumerateFiles(d))
+            .ToList();
 
         ConcurrentBag<MediaFile> mediaFiles = new();
         var ignoredFiles = new List<string>();
@@ -61,7 +57,7 @@ public class MediaIdentifingService(MediaSorterSettings settings)
         foreach (string stepLog in stepLogs)
             Console.WriteLine(stepLog);
 
-        return new MediaIdentificationResult
+        return new IdentifiedMedia
         {
             MediaFiles = [.. mediaFiles],
             IgnoredFiles = ignoredFiles

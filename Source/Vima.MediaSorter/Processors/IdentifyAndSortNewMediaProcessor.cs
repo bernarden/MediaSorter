@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Helpers;
 using Vima.MediaSorter.Services;
@@ -14,8 +15,9 @@ public class IdentifyAndSortNewMediaProcessor(MediaSorterSettings settings) : IP
         var directoryIdentifier = new DirectoryIdentifingService(settings);
         var directoryStructure = directoryIdentifier.IdentifyDirectoryStructure();
 
-        var identifier = new MediaIdentifingService(settings);
-        var result = identifier.Identify(directoryStructure);
+        var identifier = new MediaIdentifyingService(settings);
+        IEnumerable<string> directoriesToScan = new List<string> { settings.Directory }.Concat(directoryStructure.UnsortedFolders);
+        var result = identifier.Identify(directoriesToScan);
         if (result.MediaFiles.Count == 0)
         {
             Console.WriteLine("No media files found.");

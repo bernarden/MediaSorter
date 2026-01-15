@@ -2,8 +2,8 @@
 
 namespace Vima.MediaSorter.Domain;
 
-public class MediaIdentificationResult
+public class IdentifiedMedia
 {
-    public List<MediaFile> MediaFiles { get; init; } = new();
+    public IReadOnlyList<MediaFile> MediaFiles { get; init; } = new List<MediaFile>();
     public IReadOnlyList<string> IgnoredFiles { get; init; } = new List<string>();
 }
