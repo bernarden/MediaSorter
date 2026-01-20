@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using Vima.MediaSorter.Domain;
@@ -58,11 +57,19 @@ public class AppOrchestrator(IEnumerable<IProcessor> processors, MediaSorterSett
 
     private static void OutputHeader(MediaSorterSettings settings)
     {
-        Assembly assembly = Assembly.GetExecutingAssembly();
-        FileVersionInfo fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
+        var assemblyVersion = Assembly
+            .GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+        string versionInfo = assemblyVersion?.Split('+') switch
+        {
+            [var v, var h] => $"v{v} ({h[..Math.Min(7, h.Length)]})",
+            [var v] => $"v{v} (unknown)",
+            _ => "v0.0.0 (unknown)",
+        };
 
         Console.WriteLine(Separator);
-        Console.WriteLine($"Vima MediaSorter v{fileVersionInfo.FileVersion}");
+        Console.WriteLine($"Vima MediaSorter {versionInfo}");
         Console.WriteLine($"Processing Directory: {settings.Directory}");
         Console.WriteLine(Separator);
 
