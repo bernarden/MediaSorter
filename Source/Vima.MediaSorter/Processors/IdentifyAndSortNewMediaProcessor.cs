@@ -7,16 +7,23 @@ using Vima.MediaSorter.Services;
 
 namespace Vima.MediaSorter.Processors;
 
-public class IdentifyAndSortNewMediaProcessor(MediaSorterSettings settings) : IProcessor
+public class IdentifyAndSortNewMediaProcessor(
+    DirectoryIdentifingService directoryIdentifingService,
+    MediaIdentifyingService mediaIdentifyingService,
+    MediaSortingService mediaSortingService,
+    MediaSorterSettings settings
+) : IProcessor
 {
     public void Process()
     {
-        var directoryIdentifier = new DirectoryIdentifingService(settings);
-        var directoryStructure = directoryIdentifier.IdentifyDirectoryStructure();
+        var directoryStructure = directoryIdentifingService.IdentifyDirectoryStructure();
 
-        var identifier = new MediaIdentifyingService();
-        IEnumerable<string> directoriesToScan = [settings.Directory, .. directoryStructure.UnsortedFolders];
-        var result = identifier.Identify(directoriesToScan);
+        IEnumerable<string> directoriesToScan =
+        [
+            settings.Directory,
+            .. directoryStructure.UnsortedFolders,
+        ];
+        var result = mediaIdentifyingService.Identify(directoriesToScan);
         if (result.MediaFiles.Count == 0)
         {
             Console.WriteLine("No media files found.");
@@ -27,8 +34,10 @@ public class IdentifyAndSortNewMediaProcessor(MediaSorterSettings settings) : IP
         ConsoleKey proceed = ConsoleHelper.AskYesNoQuestion("Proceed to sort these files?", ConsoleKey.N);
         if (proceed != ConsoleKey.Y) return;
 
-        var sortingService = new MediaSortingService(settings);
-        List<DuplicateFile> duplicates = sortingService.Sort(result.MediaFiles, directoryStructure.DateToExistingDirectoryMapping);
+        List<DuplicateFile> duplicates = mediaSortingService.Sort(
+            result.MediaFiles,
+            directoryStructure.DateToExistingDirectoryMapping
+        );
 
         if (duplicates.Count > 0)
         {
