@@ -10,7 +10,7 @@ using Vima.MediaSorter.Services.MetadataDiscovery;
 
 namespace Vima.MediaSorter.Services;
 
-public class MediaIdentifyingService()
+public class MediaIdentifyingService(IEnumerable<IMediaFileHandler> mediaFileHandlers)
 {
     public IdentifiedMedia Identify(IEnumerable<string> directoriesToScan)
     {
@@ -25,16 +25,10 @@ public class MediaIdentifyingService()
         using var progress = new ProgressBar();
         int processedFileCounter = 0;
 
-        var handlers = new IMediaFileHandler[]
-        {
-            new JpegMediaFileHandler(),
-            new Mp4MediaFileHandler(),
-        };
-
         Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
         {
             var ext = Path.GetExtension(filePath).ToLowerInvariant();
-            var handler = handlers.FirstOrDefault(h => h.CanHandle(ext));
+            var handler = mediaFileHandlers.FirstOrDefault(h => h.CanHandle(ext));
             if (handler != null)
             {
                 var mediaFile = handler.Handle(filePath);
