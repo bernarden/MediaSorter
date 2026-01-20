@@ -11,9 +11,20 @@ using Vima.MediaSorter.Helpers;
 
 namespace Vima.MediaSorter.Services;
 
-public class MediaSortingService(MediaSorterSettings settings)
+public interface IMediaSortingService
 {
-    public List<DuplicateFile> Sort(IReadOnlyCollection<MediaFile> files, IDictionary<DateTime, string> dateToExistingDirectoryMapping)
+    List<DuplicateFile> Sort(
+        IReadOnlyCollection<MediaFile> files,
+        IDictionary<DateTime, string> dateToExistingDirectoryMapping
+    );
+}
+
+public class MediaSortingService(MediaSorterSettings settings) : IMediaSortingService
+{
+    public List<DuplicateFile> Sort(
+        IReadOnlyCollection<MediaFile> files,
+        IDictionary<DateTime, string> dateToExistingDirectoryMapping
+    )
     {
         var duplicates = new ConcurrentBag<DuplicateFile>();
         if (files == null || files.Count == 0) return duplicates.ToList();

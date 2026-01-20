@@ -6,7 +6,14 @@ using System.Linq;
 using System.Threading;
 using Vima.MediaSorter.Domain;
 
-public class DirectoryIdentifingService(MediaSorterSettings settings)
+namespace Vima.MediaSorter.Services;
+
+public interface IDirectoryIdentifingService
+{
+    DirectoryStructure IdentifyDirectoryStructure();
+}
+
+public class DirectoryIdentifingService(MediaSorterSettings settings) : IDirectoryIdentifingService
 {
     public DirectoryStructure IdentifyDirectoryStructure()
     {
