@@ -10,7 +10,12 @@ using Vima.MediaSorter.Services.MetadataDiscovery;
 
 namespace Vima.MediaSorter.Services;
 
-public class MediaIdentifyingService(IEnumerable<IMediaFileHandler> mediaFileHandlers)
+public interface IMediaIdentifyingService
+{
+    IdentifiedMedia Identify(IEnumerable<string> directoriesToScan);
+}
+
+public class MediaIdentifyingService(IEnumerable<IMediaFileHandler> mediaFileHandlers) : IMediaIdentifyingService
 {
     public IdentifiedMedia Identify(IEnumerable<string> directoriesToScan)
     {

@@ -1,13 +1,19 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Processors;
 
 namespace Vima.MediaSorter;
 
-public class AppOrchestrator(IServiceProvider serviceProvider, MediaSorterSettings settings)
+public interface IAppOrchestrator
+{
+    int Run(ProcessorOption preselectedOption);
+}
+
+public class AppOrchestrator(IEnumerable<IProcessor> processors, MediaSorterSettings settings) : IAppOrchestrator
 {
     private const string Separator = "===============================================================================";
     private const int ErrorExitCode = 1;
@@ -71,14 +77,12 @@ public class AppOrchestrator(IServiceProvider serviceProvider, MediaSorterSettin
 
     private int ExecuteByOption(ProcessorOption option)
     {
-        var processor = option switch
+        var processor = processors.FirstOrDefault(p => p.Option == option);
+        if (processor == null)
         {
-            ProcessorOption.IdentifyAndSortNewMedia =>
-                serviceProvider.GetRequiredService<IdentifyAndSortNewMediaProcessor>(),
-            _ => null
-        };
-
-        if (processor == null) return ErrorExitCode;
+            Console.Error.WriteLine($"Error: No processor found for option {option}");
+            return ErrorExitCode;
+        }
 
         Console.WriteLine($"Executing: {processor.GetType().Name}");
         processor.Process();

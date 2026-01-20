@@ -34,7 +34,7 @@ public static class Program
             string path = parseResult.GetValue(directoryOption) ?? Directory.GetCurrentDirectory();
             ProcessorOption option = parseResult.GetValue(processorOption);
             IServiceProvider serviceProvider = ConfigureServices(path);
-            var app = serviceProvider.GetRequiredService<AppOrchestrator>();
+            var app = serviceProvider.GetRequiredService<IAppOrchestrator>();
             return app.Run(option);
         });
 
@@ -46,12 +46,12 @@ public static class Program
         var services = new ServiceCollection();
         services.AddSingleton(new MediaSorterSettings { Directory = directoryPath });
 
-        services.AddTransient<AppOrchestrator>();
-        services.AddTransient<IdentifyAndSortNewMediaProcessor>();
+        services.AddTransient<IAppOrchestrator, AppOrchestrator>();
+        services.AddTransient<IProcessor, IdentifyAndSortNewMediaProcessor>();
 
-        services.AddTransient<DirectoryIdentifingService>();
-        services.AddTransient<MediaIdentifyingService>();
-        services.AddTransient<MediaSortingService>();
+        services.AddTransient<IDirectoryIdentifingService, DirectoryIdentifingService>();
+        services.AddTransient<IMediaIdentifyingService, MediaIdentifyingService>();
+        services.AddTransient<IMediaSortingService, MediaSortingService>();
 
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Mp4MediaFileHandler>();
