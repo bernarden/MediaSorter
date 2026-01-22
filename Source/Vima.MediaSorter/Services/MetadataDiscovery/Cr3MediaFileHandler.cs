@@ -2,19 +2,14 @@
 using MetadataExtractor.Formats.Exif;
 using MetadataExtractor.Formats.QuickTime;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Services.MetadataDiscovery;
 
-public class Cr3MediaFileHandler() : BaseMediaFileHandler
+public class Cr3MediaFileHandler() : BaseMediaFileHandler(".cr3")
 {
-    private static readonly HashSet<string> SupportedExtensions = new() { ".cr3" };
-
-    public override bool CanHandle(string ext) => SupportedExtensions.Contains(ext.ToLowerInvariant());
-
     public override MediaFile Handle(string filePath)
     {
         var mediaFile = new MediaFile(filePath);

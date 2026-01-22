@@ -2,19 +2,14 @@
 using MetadataExtractor.Formats.Exif;
 using MetadataExtractor.Formats.Jpeg;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Services.MetadataDiscovery;
 
-public class JpegMediaFileHandler() : BaseMediaFileHandler
+public class JpegMediaFileHandler() : BaseMediaFileHandler(".jpg", ".jpeg")
 {
-    private static readonly HashSet<string> SupportedExtensions = new() { ".jpg", ".jpeg" };
-
-    public override bool CanHandle(string ext) => SupportedExtensions.Contains(ext.ToLowerInvariant());
-
     public override MediaFile Handle(string filePath)
     {
         var mediaFile = new MediaFile(filePath);

@@ -1,16 +1,29 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Services.MetadataDiscovery;
 
-public abstract partial class BaseMediaFileHandler : IMediaFileHandler
+public interface IMediaFileHandler
 {
-    public abstract bool CanHandle(string extension);
+    public IReadOnlySet<string> SupportedExtensions { get; }
+
+    bool CanHandle(string extension);
+
+    MediaFile Handle(string filePath);
+}
+
+public abstract partial class BaseMediaFileHandler(params string[] extensions) : IMediaFileHandler
+{
+    public IReadOnlySet<string> SupportedExtensions { get; } = new HashSet<string>(extensions, StringComparer.OrdinalIgnoreCase);
+
+    public bool CanHandle(string ext) => SupportedExtensions.Contains(ext);
+
     public abstract MediaFile Handle(string filePath);
 
-    protected CreatedOn? TryGetDateFromFileName(string filePath)
+    protected static CreatedOn? TryGetDateFromFileName(string filePath)
     {
         string fileName = Path.GetFileName(filePath);
         Match match = FileNameRegex().Match(fileName);

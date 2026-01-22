@@ -1,19 +1,14 @@
 ﻿using MetadataExtractor;
 using MetadataExtractor.Formats.QuickTime;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Services.MetadataDiscovery;
 
-public class Mp4MediaFileHandler() : BaseMediaFileHandler
+public class Mp4MediaFileHandler() : BaseMediaFileHandler(".mp4")
 {
-    private static readonly HashSet<string> SupportedExtensions = new() { ".mp4" };
-
-    public override bool CanHandle(string ext) => SupportedExtensions.Contains(ext.ToLowerInvariant());
-
     public override MediaFile Handle(string filePath)
     {
         var mediaFile = new MediaFile(filePath);
