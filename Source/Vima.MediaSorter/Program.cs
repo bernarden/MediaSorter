@@ -1,7 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.CommandLine;
 using System.IO;
-using Microsoft.Extensions.DependencyInjection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Services;
@@ -54,6 +54,7 @@ public static class Program
         services.AddTransient<IMediaSortingService, MediaSortingService>();
 
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();
+        services.AddTransient<IMediaFileHandler, Cr3MediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Mp4MediaFileHandler>();
 
         return services.BuildServiceProvider();
