@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Processors;
+using Vima.MediaSorter.Services.MetadataDiscovery;
 
 namespace Vima.MediaSorter;
 
@@ -12,7 +13,10 @@ public interface IAppOrchestrator
     int Run(ProcessorOption preselectedOption);
 }
 
-public class AppOrchestrator(IEnumerable<IProcessor> processors, MediaSorterSettings settings) : IAppOrchestrator
+public class AppOrchestrator(
+    IEnumerable<IProcessor> processors,
+    IEnumerable<IMediaFileHandler> mediaFileHandlers,
+    MediaSorterSettings settings) : IAppOrchestrator
 {
     private const string Separator = "===============================================================================";
     private const int ErrorExitCode = 1;
@@ -22,7 +26,7 @@ public class AppOrchestrator(IEnumerable<IProcessor> processors, MediaSorterSett
     {
         try
         {
-            OutputHeader(settings);
+            OutputHeader(mediaFileHandlers, settings);
 
             // CLI execution hides the menu and runs only the selected processor.
             if (preselectedOption != ProcessorOption.None)
@@ -55,7 +59,9 @@ public class AppOrchestrator(IEnumerable<IProcessor> processors, MediaSorterSett
         }
     }
 
-    private static void OutputHeader(MediaSorterSettings settings)
+    private static void OutputHeader(
+        IEnumerable<IMediaFileHandler> mediaFileHandlers,
+        MediaSorterSettings settings)
     {
         var assemblyVersion = Assembly
             .GetExecutingAssembly()
@@ -68,6 +74,11 @@ public class AppOrchestrator(IEnumerable<IProcessor> processors, MediaSorterSett
             _ => "v0.0.0 (unknown)",
         };
 
+        var allExtensions = mediaFileHandlers
+            .SelectMany(h => h.SupportedExtensions)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(e => e);
+
         Console.WriteLine(Separator);
         Console.WriteLine($"Vima MediaSorter {versionInfo}");
         Console.WriteLine($"Processing Directory: {settings.Directory}");
@@ -75,8 +86,7 @@ public class AppOrchestrator(IEnumerable<IProcessor> processors, MediaSorterSett
 
         Console.WriteLine("Configuration Details:");
         Console.WriteLine($"  Folder Name Format: {settings.FolderNameFormat}");
-        Console.WriteLine($"  Image Extensions: {string.Join(", ", settings.ImageExtensions)}");
-        Console.WriteLine($"  Video Extensions: {string.Join(", ", settings.VideoExtensions)}");
+        Console.WriteLine($"  Supported Extensions: {string.Join(", ", allExtensions)}");
 
         Console.WriteLine(Separator);
         Console.WriteLine();
