@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
-using Vima.MediaSorter.Helpers;
 
 namespace Vima.MediaSorter.Services.MetadataDiscovery;
 
@@ -18,7 +17,6 @@ public class Mp4MediaFileHandler() : BaseMediaFileHandler
     public override MediaFile Handle(string filePath)
     {
         var mediaFile = new MediaFile(filePath);
-        mediaFile.RelatedFiles.AddRange(RelatedFilesHelper.FindAll(filePath));
         var createdOn = TryGetDateFromFileName(filePath);
         createdOn ??= GetVideoCreatedOn(filePath);
         mediaFile.SetCreatedOn(createdOn);

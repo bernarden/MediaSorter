@@ -51,6 +51,7 @@ public static class Program
 
         services.AddTransient<IDirectoryIdentifingService, DirectoryIdentifingService>();
         services.AddTransient<IMediaIdentifyingService, MediaIdentifyingService>();
+        services.AddTransient<IRelatedFileDiscoveryService, RelatedFileDiscoveryService>();
         services.AddTransient<IMediaSortingService, MediaSortingService>();
 
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();

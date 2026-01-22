@@ -11,6 +11,7 @@ public class IdentifyAndSortNewMediaProcessor(
     IDirectoryIdentifingService directoryIdentifingService,
     IMediaIdentifyingService mediaIdentifyingService,
     IMediaSortingService mediaSortingService,
+    IRelatedFileDiscoveryService relatedFileDiscoveryService,
     MediaSorterSettings settings
 ) : IProcessor
 {
@@ -25,19 +26,24 @@ public class IdentifyAndSortNewMediaProcessor(
             settings.Directory,
             .. directoryStructure.UnsortedFolders,
         ];
-        var result = mediaIdentifyingService.Identify(directoriesToScan);
-        if (result.MediaFiles.Count == 0)
+        var identified = mediaIdentifyingService.Identify(directoriesToScan);
+        if (identified.MediaFiles.Count == 0)
         {
             Console.WriteLine("No media files found.");
             return;
         }
 
-        Console.WriteLine($"Identified {result.MediaFiles.Count} media file(s). Ignored: {result.IgnoredFiles.Count}");
+        var associated = relatedFileDiscoveryService.AssociateRelatedFiles(
+            identified.MediaFiles, identified.IgnoredFiles);
+
+        string associatedInfo = associated.AssociatedFiles.Count > 0 ? $" (+{associated.AssociatedFiles.Count} associated)" : "";
+        Console.WriteLine($"Identified: {identified.MediaFiles.Count}{associatedInfo} | Ignored: {associated.RemainingIgnoredFiles.Count}");
+
         ConsoleKey proceed = ConsoleHelper.AskYesNoQuestion("Proceed to sort these files?", ConsoleKey.N);
         if (proceed != ConsoleKey.Y) return;
 
         List<DuplicateFile> duplicates = mediaSortingService.Sort(
-            result.MediaFiles,
+            identified.MediaFiles,
             directoryStructure.DateToExistingDirectoryMapping
         );
 
