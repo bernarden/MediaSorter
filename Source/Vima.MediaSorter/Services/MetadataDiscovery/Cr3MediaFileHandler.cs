@@ -16,6 +16,7 @@ public class Cr3MediaFileHandler() : BaseMediaFileHandler(".cr3")
         var createdOn = TryGetDateFromFileName(filePath);
         createdOn ??= GetCr3CreatedOn(filePath);
         mediaFile.SetCreatedOn(createdOn);
+        mediaFile.SetTargetSubFolder("raw");
         return mediaFile;
     }
 
