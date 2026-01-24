@@ -11,6 +11,7 @@ namespace Vima.MediaSorter.Processors;
 public class IdentifyAndSortNewMediaProcessor(
     IDirectoryIdentificationService directoryIdentifingService,
     IMediaIdentificationService mediaIdentifyingService,
+    ITimeZoneAdjustmentService timeZoneAdjusterService,
     IMediaSortingService mediaSortingService,
     IRelatedFilesDiscoveryService relatedFileDiscoveryService,
     IOptions<MediaSorterOptions> options
@@ -41,6 +42,8 @@ public class IdentifyAndSortNewMediaProcessor(
 
         ConsoleKey proceed = ConsoleHelper.AskYesNoQuestion("Proceed to sort these files?", ConsoleKey.N);
         if (proceed != ConsoleKey.Y) return;
+
+        timeZoneAdjusterService.ApplyOffsetsIfNeeded(identified.MediaFiles);
 
         List<DuplicateFile> duplicates = mediaSortingService.Sort(
             identified.MediaFiles,

@@ -21,7 +21,6 @@ public interface IMediaSortingService
 public class MediaSortingService(
     IFileMover fileMover,
     IDirectoryResolver directoryResolver,
-    ITimeZoneAdjustmentService timeZoneAdjuster,
     IOptions<MediaSorterOptions> options) : IMediaSortingService
 {
     private readonly MediaSorterOptions _options = options.Value;
@@ -32,13 +31,11 @@ public class MediaSortingService(
     {
         if (files == null || files.Count == 0) return [];
 
-        timeZoneAdjuster.ApplyOffsetsIfNeeded(files);
-
         Console.Write("Sorting your media... ");
         using ProgressBar progress = new();
-        var duplicates = new ConcurrentBag<DuplicateFile>();
-        var stepLogs = new ConcurrentBag<string>();
         int processedFileCounter = 0;
+        var stepLogs = new ConcurrentBag<string>();
+        var duplicates = new ConcurrentBag<DuplicateFile>();
         Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 25 }, file =>
         {
             ProcessFile(file, dateToExistingDirectoryMapping, duplicates, stepLogs);
