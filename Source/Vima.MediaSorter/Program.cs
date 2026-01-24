@@ -45,7 +45,7 @@ public static class Program
     public static IServiceProvider ConfigureServices(string directoryPath)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(new MediaSorterOptions { Directory = directoryPath });
+        services.Configure<MediaSorterOptions>(options => { options.Directory = directoryPath; });
 
         services.AddTransient<IAppOrchestrator, AppOrchestrator>();
         services.AddTransient<IProcessor, IdentifyAndSortNewMediaProcessor>();

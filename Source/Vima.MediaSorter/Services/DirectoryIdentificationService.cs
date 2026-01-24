@@ -1,10 +1,11 @@
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Concurrent;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
@@ -14,7 +15,9 @@ public interface IDirectoryIdentificationService
     DirectoryStructure IdentifyDirectoryStructure();
 }
 
-public class DirectoryIdentificationService(MediaSorterOptions options) : IDirectoryIdentificationService
+public class DirectoryIdentificationService(
+    IDirectoryResolver directoryResolver,
+    IOptions<MediaSorterOptions> options) : IDirectoryIdentificationService
 {
     public DirectoryStructure IdentifyDirectoryStructure()
     {
@@ -24,13 +27,13 @@ public class DirectoryIdentificationService(MediaSorterOptions options) : IDirec
 
         int counter = 0;
         DirectoryStructure result = new();
-        string[] directoryPaths = Directory.GetDirectories(options.Directory);
+        string[] directoryPaths = Directory.GetDirectories(options.Value.Directory);
         foreach (string directoryPath in directoryPaths)
         {
             DirectoryInfo directoryInfo = new(directoryPath);
             string directoryName = directoryInfo.Name;
 
-            DateTime? directoryDate = GetDirectoryDateFromPath(directoryName);
+            DateTime? directoryDate = directoryResolver.GetDateFromDirectoryName(directoryName);
             if (directoryDate == null)
             {
                 result.UnsortedFolders.Add(directoryPath);
@@ -73,16 +76,5 @@ public class DirectoryIdentificationService(MediaSorterOptions options) : IDirec
         }
 
         return result;
-    }
-
-    private DateTime? GetDirectoryDateFromPath(string directoryName)
-    {
-        if (directoryName.Length < options.FolderNameFormat.Length) return null;
-
-        string directoryNameBeginning = directoryName[..options.FolderNameFormat.Length];
-        return DateTime.TryParseExact(directoryNameBeginning, options.FolderNameFormat,
-            CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result)
-            ? result
-            : null;
     }
 }

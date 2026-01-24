@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Options;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Vima.MediaSorter.Domain;
@@ -12,7 +13,7 @@ public class IdentifyAndSortNewMediaProcessor(
     IMediaIdentificationService mediaIdentifyingService,
     IMediaSortingService mediaSortingService,
     IRelatedFilesDiscoveryService relatedFileDiscoveryService,
-    MediaSorterOptions options
+    IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
     public ProcessorOptions Option => ProcessorOptions.IdentifyAndSortNewMedia;
@@ -23,7 +24,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
         IEnumerable<string> directoriesToScan =
         [
-            options.Directory,
+            options.Value.Directory,
             .. directoryStructure.UnsortedFolders,
         ];
         var identified = mediaIdentifyingService.Identify(directoriesToScan);

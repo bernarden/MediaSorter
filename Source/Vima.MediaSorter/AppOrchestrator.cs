@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Options;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -16,17 +17,18 @@ public interface IAppOrchestrator
 public class AppOrchestrator(
     IEnumerable<IProcessor> processors,
     IEnumerable<IMediaFileHandler> mediaFileHandlers,
-    MediaSorterOptions options) : IAppOrchestrator
+    IOptions<MediaSorterOptions> options) : IAppOrchestrator
 {
     private const string Separator = "===============================================================================";
     private const int ErrorExitCode = 1;
     private const int SuccessExitCode = 0;
+    private readonly MediaSorterOptions _options = options.Value;
 
     public int Run(ProcessorOptions preselectedOption)
     {
         try
         {
-            OutputHeader(mediaFileHandlers, options);
+            OutputHeader(mediaFileHandlers);
 
             // CLI execution hides the menu and runs only the selected processor.
             if (preselectedOption != ProcessorOptions.None)
@@ -59,9 +61,7 @@ public class AppOrchestrator(
         }
     }
 
-    private static void OutputHeader(
-        IEnumerable<IMediaFileHandler> mediaFileHandlers,
-        MediaSorterOptions options)
+    private void OutputHeader(IEnumerable<IMediaFileHandler> mediaFileHandlers)
     {
         var assemblyVersion = Assembly
             .GetExecutingAssembly()
@@ -81,11 +81,11 @@ public class AppOrchestrator(
 
         Console.WriteLine(Separator);
         Console.WriteLine($"Vima MediaSorter {versionInfo}");
-        Console.WriteLine($"Processing Directory: {options.Directory}");
+        Console.WriteLine($"Processing Directory: {_options.Directory}");
         Console.WriteLine(Separator);
 
         Console.WriteLine("Configuration Details:");
-        Console.WriteLine($"  Folder Name Format: {options.FolderNameFormat}");
+        Console.WriteLine($"  Folder Name Format: {_options.FolderNameFormat}");
         Console.WriteLine($"  Supported Extensions: {string.Join(", ", allExtensions)}");
 
         Console.WriteLine(Separator);
