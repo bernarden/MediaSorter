@@ -4,7 +4,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using Vima.MediaSorter.Domain;
 
-namespace Vima.MediaSorter.Services.MetadataDiscovery;
+namespace Vima.MediaSorter.Services.MediaFileHandlers;
 
 public interface IMediaFileHandler
 {

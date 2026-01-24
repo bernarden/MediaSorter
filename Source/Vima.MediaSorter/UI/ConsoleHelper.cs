@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text;
 
-namespace Vima.MediaSorter.Helpers;
+namespace Vima.MediaSorter.UI;
 
 public class ConsoleHelper
 {

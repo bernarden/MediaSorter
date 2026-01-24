@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Processors;
-using Vima.MediaSorter.Services.MetadataDiscovery;
+using Vima.MediaSorter.Services.MediaFileHandlers;
 
 namespace Vima.MediaSorter;
 
