@@ -23,38 +23,15 @@ public class DirectoryIdentificationService(
     {
         Console.Write("Identifying directory structure... ");
         using ProgressBar progress = new();
-        ConcurrentDictionary<DateTime, ConcurrentBag<string>> ignoredFolderForDate = new();
-
-        int counter = 0;
+        int processedDirectoryCounter = 0;
         DirectoryStructure result = new();
+        ConcurrentDictionary<DateTime, ConcurrentBag<string>> ignoredFolderForDate = new();
         string[] directoryPaths = Directory.GetDirectories(options.Value.Directory);
         foreach (string directoryPath in directoryPaths)
         {
-            DirectoryInfo directoryInfo = new(directoryPath);
-            string directoryName = directoryInfo.Name;
-
-            DateTime? directoryDate = directoryResolver.GetDateFromDirectoryName(directoryName);
-            if (directoryDate == null)
-            {
-                result.UnsortedFolders.Add(directoryPath);
-            }
-            else
-            {
-                result.SortedFolders.Add(directoryPath);
-                DateTime date = directoryDate.Value.Date;
-                if (result.DateToExistingDirectoryMapping.TryGetValue(date, out string? existingDirectoryPath))
-                {
-                    var ignoredFolders = ignoredFolderForDate.GetOrAdd(date, _ => new ConcurrentBag<string>());
-                    ignoredFolders.Add(directoryName);
-                }
-                else
-                {
-                    result.DateToExistingDirectoryMapping.Add(date, directoryPath);
-                }
-            }
-
-            Interlocked.Increment(ref counter);
-            progress.Report((double)counter / directoryPaths.Length);
+            ProcessDirectoryPath(directoryPath, result, ignoredFolderForDate);
+            Interlocked.Increment(ref processedDirectoryCounter);
+            progress.Report((double)processedDirectoryCounter / directoryPaths.Length);
         }
 
         progress.Dispose();
@@ -76,5 +53,34 @@ public class DirectoryIdentificationService(
         }
 
         return result;
+    }
+
+    private void ProcessDirectoryPath(
+        string directoryPath,
+        DirectoryStructure result,
+        ConcurrentDictionary<DateTime, ConcurrentBag<string>> ignoredFolderForDate)
+    {
+        DirectoryInfo directoryInfo = new(directoryPath);
+        string directoryName = directoryInfo.Name;
+
+        DateTime? directoryDate = directoryResolver.GetDateFromDirectoryName(directoryName);
+        if (directoryDate == null)
+        {
+            result.UnsortedFolders.Add(directoryPath);
+        }
+        else
+        {
+            result.SortedFolders.Add(directoryPath);
+            DateTime date = directoryDate.Value.Date;
+            if (result.DateToExistingDirectoryMapping.TryGetValue(date, out string? existingDirectoryPath))
+            {
+                var ignoredFolders = ignoredFolderForDate.GetOrAdd(date, _ => new ConcurrentBag<string>());
+                ignoredFolders.Add(directoryName);
+            }
+            else
+            {
+                result.DateToExistingDirectoryMapping.Add(date, directoryPath);
+            }
+        }
     }
 }

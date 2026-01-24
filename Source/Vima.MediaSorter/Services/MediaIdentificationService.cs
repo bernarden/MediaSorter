@@ -21,30 +21,14 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
     public IdentifiedMedia Identify(IEnumerable<string> directoriesToScan)
     {
         Console.Write("Identifying your media... ");
-
-        List<string> filePaths = directoriesToScan
-            .SelectMany(d => Directory.EnumerateFiles(d))
-            .ToList();
-
-        ConcurrentBag<MediaFile> mediaFiles = new();
-        ConcurrentBag<string> ignoredFiles = new();
         using var progress = new ProgressBar();
         int processedFileCounter = 0;
-
+        ConcurrentBag<MediaFile> mediaFiles = new();
+        ConcurrentBag<string> ignoredFiles = new();
+        List<string> filePaths = [.. directoriesToScan.SelectMany(d => Directory.EnumerateFiles(d))];
         Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
         {
-            var ext = Path.GetExtension(filePath).ToLowerInvariant();
-            var handler = mediaFileHandlers.FirstOrDefault(h => h.CanHandle(ext));
-            if (handler != null)
-            {
-                var mediaFile = handler.Handle(filePath);
-                mediaFiles.Add(mediaFile);
-            }
-            else
-            {
-                ignoredFiles.Add(filePath);
-            }
-
+            ProcessFilePath(filePath, mediaFiles, ignoredFiles);
             Interlocked.Increment(ref processedFileCounter);
             progress.Report((double)processedFileCounter / filePaths.Count);
         });
@@ -57,5 +41,20 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
             MediaFiles = [.. mediaFiles],
             IgnoredFiles = [.. ignoredFiles]
         };
+    }
+
+    private void ProcessFilePath(string filePath, ConcurrentBag<MediaFile> mediaFiles, ConcurrentBag<string> ignoredFiles)
+    {
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        var handler = mediaFileHandlers.FirstOrDefault(h => h.CanHandle(ext));
+        if (handler != null)
+        {
+            var mediaFile = handler.Handle(filePath);
+            mediaFiles.Add(mediaFile);
+        }
+        else
+        {
+            ignoredFiles.Add(filePath);
+        }
     }
 }
