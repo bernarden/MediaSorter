@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 

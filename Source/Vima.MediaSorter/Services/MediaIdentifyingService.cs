@@ -6,7 +6,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Vima.MediaSorter.Domain;
-using Vima.MediaSorter.Services.MetadataDiscovery;
+using Vima.MediaSorter.Services.MediaFileHandlers;
+using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 

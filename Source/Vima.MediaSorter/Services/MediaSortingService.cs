@@ -7,7 +7,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Vima.MediaSorter.Domain;
-using Vima.MediaSorter.Helpers;
+using Vima.MediaSorter.Infrastructure;
+using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 
@@ -19,7 +20,7 @@ public interface IMediaSortingService
     );
 }
 
-public class MediaSortingService(MediaSorterSettings settings) : IMediaSortingService
+public class MediaSortingService(IFileMover fileMover, MediaSorterSettings settings) : IMediaSortingService
 {
     public List<DuplicateFile> Sort(
         IReadOnlyCollection<MediaFile> files,
@@ -78,28 +79,26 @@ public class MediaSortingService(MediaSorterSettings settings) : IMediaSortingSe
 
     private void MoveFile(string filePath, DateTime createdDateTime, string? targetSubFolder, IDictionary<DateTime, string> dateToExistingDirectoryMapping, ConcurrentBag<DuplicateFile> duplicates)
     {
-        if (!dateToExistingDirectoryMapping.TryGetValue(createdDateTime.Date, out string? directoryName))
+        if (!dateToExistingDirectoryMapping.TryGetValue(createdDateTime.Date, out string? targetDirectoryName))
         {
-            directoryName = createdDateTime.ToString(settings.FolderNameFormat, CultureInfo.InvariantCulture);
+            targetDirectoryName = createdDateTime.ToString(settings.FolderNameFormat, CultureInfo.InvariantCulture);
         }
 
-        string destinationFileName = Path.GetFileName(filePath);
+        string targetFileName = Path.GetFileName(filePath);
 
-        string destinationFolderPath = Path.Combine(settings.Directory, directoryName);
+        string targetFolderPath = Path.Combine(settings.Directory, targetDirectoryName);
         if (!string.IsNullOrEmpty(targetSubFolder))
         {
-            destinationFolderPath = Path.Combine(destinationFolderPath, targetSubFolder);
+            targetFolderPath = Path.Combine(targetFolderPath, targetSubFolder);
         }
 
-        if (filePath.StartsWith(destinationFolderPath, StringComparison.OrdinalIgnoreCase)) return;
+        if (filePath.StartsWith(targetFolderPath, StringComparison.OrdinalIgnoreCase)) return;
 
         // Don't move files that have been previously (manually?) put into a dated folder.
         if (IsAlreadySorted(filePath)) return;
 
-        (FileMovingHelper.MoveStatus status, string? destinationPath) =
-            FileMovingHelper.MoveFile(filePath, destinationFolderPath, destinationFileName);
-
-        if (status == FileMovingHelper.MoveStatus.Duplicate)
+        var (status, destinationPath) = fileMover.Move(filePath, targetFolderPath, targetFileName);
+        if (status == MoveStatus.Duplicate)
         {
             duplicates.Add(new DuplicateFile(filePath, destinationPath ?? string.Empty));
         }

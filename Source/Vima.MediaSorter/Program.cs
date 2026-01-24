@@ -3,9 +3,10 @@ using System;
 using System.CommandLine;
 using System.IO;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Services;
-using Vima.MediaSorter.Services.MetadataDiscovery;
+using Vima.MediaSorter.Services.MediaFileHandlers;
 
 namespace Vima.MediaSorter;
 
@@ -57,6 +58,9 @@ public static class Program
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Cr3MediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Mp4MediaFileHandler>();
+
+        services.AddTransient<IDuplicateDetector, DuplicateDetector>();
+        services.AddTransient<IFileMover, FileMover>();
 
         return services.BuildServiceProvider();
     }

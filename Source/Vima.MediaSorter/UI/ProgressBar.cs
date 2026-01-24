@@ -2,7 +2,7 @@
 using System.Text;
 using System.Threading;
 
-namespace Vima.MediaSorter.Domain;
+namespace Vima.MediaSorter.UI;
 
 /// <summary>
 /// An ASCII progress bar

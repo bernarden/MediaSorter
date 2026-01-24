@@ -6,7 +6,7 @@ using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
 
-namespace Vima.MediaSorter.Services.MetadataDiscovery;
+namespace Vima.MediaSorter.Services.MediaFileHandlers;
 
 public class JpegMediaFileHandler() : BaseMediaFileHandler(".jpg", ".jpeg")
 {
