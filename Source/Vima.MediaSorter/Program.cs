@@ -61,6 +61,8 @@ public static class Program
 
         services.AddTransient<IDuplicateDetector, DuplicateDetector>();
         services.AddTransient<IFileMover, FileMover>();
+        services.AddTransient<IDirectoryResolver, DirectoryResolver>();
+        services.AddTransient<ITimeZoneAdjustingService, TimeZoneAdjustingService>();
 
         return services.BuildServiceProvider();
     }
