@@ -7,12 +7,12 @@ using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Services;
 
-public interface IRelatedFileDiscoveryService
+public interface IRelatedFilesDiscoveryService
 {
     AssociatedMedia AssociateRelatedFiles(IEnumerable<MediaFile> identifiedFiles, IEnumerable<string> ignoredFiles);
 }
 
-public partial class RelatedFileDiscoveryService : IRelatedFileDiscoveryService
+public partial class RelatedFilesDiscoveryService : IRelatedFilesDiscoveryService
 {
     public AssociatedMedia AssociateRelatedFiles(IEnumerable<MediaFile> identifiedFiles, IEnumerable<string> ignoredFiles)
     {

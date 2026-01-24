@@ -1,6 +1,6 @@
 ﻿namespace Vima.MediaSorter.Domain;
 
-public enum ProcessorOption
+public enum ProcessorOptions
 {
     None = -1,
     Exit = 0,

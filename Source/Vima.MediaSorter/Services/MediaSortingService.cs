@@ -20,8 +20,8 @@ public interface IMediaSortingService
 public class MediaSortingService(
     IFileMover fileMover,
     IDirectoryResolver directoryResolver,
-    ITimeZoneAdjustingService timeZoneAdjuster,
-    MediaSorterSettings settings) : IMediaSortingService
+    ITimeZoneAdjustmentService timeZoneAdjuster,
+    MediaSorterOptions options) : IMediaSortingService
 {
     public List<DuplicateFile> Sort(
         IReadOnlyCollection<MediaFile> files,
@@ -58,7 +58,7 @@ public class MediaSortingService(
     {
         if (file.CreatedOn == null)
         {
-            stepLogs.Add($"  Warning: No creation date detected: {Path.GetRelativePath(settings.Directory, file.FilePath)}");
+            stepLogs.Add($"  Warning: No creation date detected: {Path.GetRelativePath(options.Directory, file.FilePath)}");
             return;
         }
 
@@ -78,7 +78,7 @@ public class MediaSortingService(
 
             catch (Exception e)
             {
-                stepLogs.Add($"  Warning: Failed to sort: {Path.GetRelativePath(settings.Directory, file.FilePath)}. Error: {e.Message}");
+                stepLogs.Add($"  Warning: Failed to sort: {Path.GetRelativePath(options.Directory, file.FilePath)}. Error: {e.Message}");
             }
         }
     }

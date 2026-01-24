@@ -8,14 +8,14 @@ using Vima.MediaSorter.UI;
 namespace Vima.MediaSorter.Processors;
 
 public class IdentifyAndSortNewMediaProcessor(
-    IDirectoryIdentifingService directoryIdentifingService,
-    IMediaIdentifyingService mediaIdentifyingService,
+    IDirectoryIdentificationService directoryIdentifingService,
+    IMediaIdentificationService mediaIdentifyingService,
     IMediaSortingService mediaSortingService,
-    IRelatedFileDiscoveryService relatedFileDiscoveryService,
-    MediaSorterSettings settings
+    IRelatedFilesDiscoveryService relatedFileDiscoveryService,
+    MediaSorterOptions options
 ) : IProcessor
 {
-    public ProcessorOption Option => ProcessorOption.IdentifyAndSortNewMedia;
+    public ProcessorOptions Option => ProcessorOptions.IdentifyAndSortNewMedia;
 
     public void Process()
     {
@@ -23,7 +23,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
         IEnumerable<string> directoriesToScan =
         [
-            settings.Directory,
+            options.Directory,
             .. directoryStructure.UnsortedFolders,
         ];
         var identified = mediaIdentifyingService.Identify(directoriesToScan);

@@ -11,12 +11,12 @@ using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 
-public interface IMediaIdentifyingService
+public interface IMediaIdentificationService
 {
     IdentifiedMedia Identify(IEnumerable<string> directoriesToScan);
 }
 
-public class MediaIdentifyingService(IEnumerable<IMediaFileHandler> mediaFileHandlers) : IMediaIdentifyingService
+public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFileHandlers) : IMediaIdentificationService
 {
     public IdentifiedMedia Identify(IEnumerable<string> directoriesToScan)
     {

@@ -6,12 +6,12 @@ using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 
-public interface ITimeZoneAdjustingService
+public interface ITimeZoneAdjustmentService
 {
     void ApplyOffsetsIfNeeded(IEnumerable<MediaFile> files);
 }
 
-public class TimeZoneAdjustingService : ITimeZoneAdjustingService
+public class TimeZoneAdjustmentService : ITimeZoneAdjustmentService
 {
     public void ApplyOffsetsIfNeeded(IEnumerable<MediaFile> files)
     {

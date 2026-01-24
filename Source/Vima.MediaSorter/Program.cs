@@ -20,10 +20,10 @@ public static class Program
                 "The directory to process. Defaults to the executable's launch directory.",
         };
 
-        Option<ProcessorOption> processorOption = new("--processor", "-p")
+        Option<ProcessorOptions> processorOption = new("--processor", "-p")
         {
             Description = "Execute a specific processor directly, bypassing the interactive menu.",
-            DefaultValueFactory = _ => ProcessorOption.None,
+            DefaultValueFactory = _ => ProcessorOptions.None,
         };
 
         RootCommand rootCommand = new("Sorts media files into organised folders.");
@@ -33,7 +33,7 @@ public static class Program
         rootCommand.SetAction(parseResult =>
         {
             string path = parseResult.GetValue(directoryOption) ?? Directory.GetCurrentDirectory();
-            ProcessorOption option = parseResult.GetValue(processorOption);
+            ProcessorOptions option = parseResult.GetValue(processorOption);
             IServiceProvider serviceProvider = ConfigureServices(path);
             var app = serviceProvider.GetRequiredService<IAppOrchestrator>();
             return app.Run(option);
@@ -45,15 +45,16 @@ public static class Program
     public static IServiceProvider ConfigureServices(string directoryPath)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(new MediaSorterSettings { Directory = directoryPath });
+        services.AddSingleton(new MediaSorterOptions { Directory = directoryPath });
 
         services.AddTransient<IAppOrchestrator, AppOrchestrator>();
         services.AddTransient<IProcessor, IdentifyAndSortNewMediaProcessor>();
 
-        services.AddTransient<IDirectoryIdentifingService, DirectoryIdentifingService>();
-        services.AddTransient<IMediaIdentifyingService, MediaIdentifyingService>();
-        services.AddTransient<IRelatedFileDiscoveryService, RelatedFileDiscoveryService>();
+        services.AddTransient<IDirectoryIdentificationService, DirectoryIdentificationService>();
+        services.AddTransient<IMediaIdentificationService, MediaIdentificationService>();
+        services.AddTransient<IRelatedFilesDiscoveryService, RelatedFilesDiscoveryService>();
         services.AddTransient<IMediaSortingService, MediaSortingService>();
+        services.AddTransient<ITimeZoneAdjustmentService, TimeZoneAdjustmentService>();
 
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Cr3MediaFileHandler>();
@@ -62,7 +63,6 @@ public static class Program
         services.AddTransient<IDuplicateDetector, DuplicateDetector>();
         services.AddTransient<IFileMover, FileMover>();
         services.AddTransient<IDirectoryResolver, DirectoryResolver>();
-        services.AddTransient<ITimeZoneAdjustingService, TimeZoneAdjustingService>();
 
         return services.BuildServiceProvider();
     }

@@ -9,12 +9,12 @@ using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 
-public interface IDirectoryIdentifingService
+public interface IDirectoryIdentificationService
 {
     DirectoryStructure IdentifyDirectoryStructure();
 }
 
-public class DirectoryIdentifingService(MediaSorterSettings settings) : IDirectoryIdentifingService
+public class DirectoryIdentificationService(MediaSorterOptions options) : IDirectoryIdentificationService
 {
     public DirectoryStructure IdentifyDirectoryStructure()
     {
@@ -24,7 +24,7 @@ public class DirectoryIdentifingService(MediaSorterSettings settings) : IDirecto
 
         int counter = 0;
         DirectoryStructure result = new();
-        string[] directoryPaths = Directory.GetDirectories(settings.Directory);
+        string[] directoryPaths = Directory.GetDirectories(options.Directory);
         foreach (string directoryPath in directoryPaths)
         {
             DirectoryInfo directoryInfo = new(directoryPath);
@@ -77,10 +77,10 @@ public class DirectoryIdentifingService(MediaSorterSettings settings) : IDirecto
 
     private DateTime? GetDirectoryDateFromPath(string directoryName)
     {
-        if (directoryName.Length < settings.FolderNameFormat.Length) return null;
+        if (directoryName.Length < options.FolderNameFormat.Length) return null;
 
-        string directoryNameBeginning = directoryName[..settings.FolderNameFormat.Length];
-        return DateTime.TryParseExact(directoryNameBeginning, settings.FolderNameFormat,
+        string directoryNameBeginning = directoryName[..options.FolderNameFormat.Length];
+        return DateTime.TryParseExact(directoryNameBeginning, options.FolderNameFormat,
             CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result)
             ? result
             : null;

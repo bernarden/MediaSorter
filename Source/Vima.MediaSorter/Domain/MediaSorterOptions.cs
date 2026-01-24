@@ -1,6 +1,6 @@
 namespace Vima.MediaSorter.Domain;
 
-public class MediaSorterSettings
+public class MediaSorterOptions
 {
     public string Directory { get; set; } = string.Empty;
 

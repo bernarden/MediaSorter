@@ -4,6 +4,6 @@ namespace Vima.MediaSorter.Processors;
 
 public interface IProcessor
 {
-    ProcessorOption Option { get; }
+    ProcessorOptions Option { get; }
     public void Process();
 }
