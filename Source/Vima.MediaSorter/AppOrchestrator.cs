@@ -10,26 +10,26 @@ namespace Vima.MediaSorter;
 
 public interface IAppOrchestrator
 {
-    int Run(ProcessorOption preselectedOption);
+    int Run(ProcessorOptions preselectedOption);
 }
 
 public class AppOrchestrator(
     IEnumerable<IProcessor> processors,
     IEnumerable<IMediaFileHandler> mediaFileHandlers,
-    MediaSorterSettings settings) : IAppOrchestrator
+    MediaSorterOptions options) : IAppOrchestrator
 {
     private const string Separator = "===============================================================================";
     private const int ErrorExitCode = 1;
     private const int SuccessExitCode = 0;
 
-    public int Run(ProcessorOption preselectedOption)
+    public int Run(ProcessorOptions preselectedOption)
     {
         try
         {
-            OutputHeader(mediaFileHandlers, settings);
+            OutputHeader(mediaFileHandlers, options);
 
             // CLI execution hides the menu and runs only the selected processor.
-            if (preselectedOption != ProcessorOption.None)
+            if (preselectedOption != ProcessorOptions.None)
             {
                 Console.WriteLine($"Mode: Automatic selection via command-line argument (-p {preselectedOption}).");
                 return ExecuteByOption(preselectedOption);
@@ -37,8 +37,8 @@ public class AppOrchestrator(
 
             while (true)
             {
-                ProcessorOption selectedOption = GetProcessorOption();
-                if (selectedOption == ProcessorOption.Exit) break;
+                ProcessorOptions selectedOption = GetProcessorOption();
+                if (selectedOption == ProcessorOptions.Exit) break;
                 ExecuteByOption(selectedOption);
             }
 
@@ -61,7 +61,7 @@ public class AppOrchestrator(
 
     private static void OutputHeader(
         IEnumerable<IMediaFileHandler> mediaFileHandlers,
-        MediaSorterSettings settings)
+        MediaSorterOptions options)
     {
         var assemblyVersion = Assembly
             .GetExecutingAssembly()
@@ -81,18 +81,18 @@ public class AppOrchestrator(
 
         Console.WriteLine(Separator);
         Console.WriteLine($"Vima MediaSorter {versionInfo}");
-        Console.WriteLine($"Processing Directory: {settings.Directory}");
+        Console.WriteLine($"Processing Directory: {options.Directory}");
         Console.WriteLine(Separator);
 
         Console.WriteLine("Configuration Details:");
-        Console.WriteLine($"  Folder Name Format: {settings.FolderNameFormat}");
+        Console.WriteLine($"  Folder Name Format: {options.FolderNameFormat}");
         Console.WriteLine($"  Supported Extensions: {string.Join(", ", allExtensions)}");
 
         Console.WriteLine(Separator);
         Console.WriteLine();
     }
 
-    private int ExecuteByOption(ProcessorOption option)
+    private int ExecuteByOption(ProcessorOptions option)
     {
         var processor = processors.FirstOrDefault(p => p.Option == option);
         if (processor == null)
@@ -108,20 +108,20 @@ public class AppOrchestrator(
         return SuccessExitCode;
     }
 
-    private static ProcessorOption GetProcessorOption()
+    private static ProcessorOptions GetProcessorOption()
     {
         Console.WriteLine("Select an option (Default is exit):");
-        Console.WriteLine($"  {(int)ProcessorOption.Exit}. Exit.");
-        Console.WriteLine($"  {(int)ProcessorOption.IdentifyAndSortNewMedia}. Identify and sort new media.");
+        Console.WriteLine($"  {(int)ProcessorOptions.Exit}. Exit.");
+        Console.WriteLine($"  {(int)ProcessorOptions.IdentifyAndSortNewMedia}. Identify and sort new media.");
         Console.Write("Enter choice: ");
         string? input = Console.ReadLine();
         if (int.TryParse(input, out int intChoice) &&
-            Enum.IsDefined(typeof(ProcessorOption), intChoice) &&
-            intChoice != (int)ProcessorOption.None)
+            Enum.IsDefined(typeof(ProcessorOptions), intChoice) &&
+            intChoice != (int)ProcessorOptions.None)
         {
-            return (ProcessorOption)intChoice;
+            return (ProcessorOptions)intChoice;
         }
 
-        return ProcessorOption.Exit;
+        return ProcessorOptions.Exit;
     }
 }
