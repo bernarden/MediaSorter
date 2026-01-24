@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Options;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -16,17 +17,19 @@ public interface IDirectoryResolver
     );
 }
 
-public class DirectoryResolver(MediaSorterOptions options) : IDirectoryResolver
+public class DirectoryResolver(IOptions<MediaSorterOptions> options) : IDirectoryResolver
 {
+    private readonly MediaSorterOptions _options = options.Value;
+
     public DateTime? GetDateFromDirectoryName(string directoryName)
     {
-        if (directoryName.Length < options.FolderNameFormat.Length)
+        if (directoryName.Length < _options.FolderNameFormat.Length)
             return null;
 
-        string directoryNameBeginning = directoryName.Substring(0, options.FolderNameFormat.Length);
+        string directoryNameBeginning = directoryName.Substring(0, _options.FolderNameFormat.Length);
         return DateTime.TryParseExact(
             directoryNameBeginning,
-            options.FolderNameFormat,
+            _options.FolderNameFormat,
             CultureInfo.InvariantCulture,
             DateTimeStyles.None,
             out DateTime result
@@ -42,9 +45,9 @@ public class DirectoryResolver(MediaSorterOptions options) : IDirectoryResolver
     )
     {
         if (!dateToExistingDirectoryMapping.TryGetValue(date.Date, out var folderName))
-            folderName = date.ToString(options.FolderNameFormat, CultureInfo.InvariantCulture);
+            folderName = date.ToString(_options.FolderNameFormat, CultureInfo.InvariantCulture);
 
-        var path = Path.Combine(options.Directory, folderName);
+        var path = Path.Combine(_options.Directory, folderName);
         return string.IsNullOrEmpty(subFolder) ? path : Path.Combine(path, subFolder);
     }
 }

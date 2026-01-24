@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -21,8 +22,10 @@ public class MediaSortingService(
     IFileMover fileMover,
     IDirectoryResolver directoryResolver,
     ITimeZoneAdjustmentService timeZoneAdjuster,
-    MediaSorterOptions options) : IMediaSortingService
+    IOptions<MediaSorterOptions> options) : IMediaSortingService
 {
+    private readonly MediaSorterOptions _options = options.Value;
+
     public List<DuplicateFile> Sort(
         IReadOnlyCollection<MediaFile> files,
         IDictionary<DateTime, string> dateToExistingDirectoryMapping)
@@ -58,7 +61,7 @@ public class MediaSortingService(
     {
         if (file.CreatedOn == null)
         {
-            stepLogs.Add($"  Warning: No creation date detected: {Path.GetRelativePath(options.Directory, file.FilePath)}");
+            stepLogs.Add($"  Warning: No creation date detected: {Path.GetRelativePath(_options.Directory, file.FilePath)}");
             return;
         }
 
@@ -78,7 +81,7 @@ public class MediaSortingService(
 
             catch (Exception e)
             {
-                stepLogs.Add($"  Warning: Failed to sort: {Path.GetRelativePath(options.Directory, file.FilePath)}. Error: {e.Message}");
+                stepLogs.Add($"  Warning: Failed to sort: {Path.GetRelativePath(_options.Directory, file.FilePath)}. Error: {e.Message}");
             }
         }
     }
