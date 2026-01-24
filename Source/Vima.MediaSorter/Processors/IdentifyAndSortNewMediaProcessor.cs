@@ -35,9 +35,8 @@ public class IdentifyAndSortNewMediaProcessor(
 
         var associated = relatedFileDiscoveryService.AssociateRelatedFiles(
             identified.MediaFiles, identified.IgnoredFiles);
-
         string associatedInfo = associated.AssociatedFiles.Count > 0 ? $" (+{associated.AssociatedFiles.Count} associated)" : "";
-        Console.WriteLine($"Identified: {identified.MediaFiles.Count}{associatedInfo} | Ignored: {associated.RemainingIgnoredFiles.Count}");
+        Console.WriteLine($"  Identified: {identified.MediaFiles.Count}{associatedInfo} | Ignored: {associated.RemainingIgnoredFiles.Count}");
 
         ConsoleKey proceed = ConsoleHelper.AskYesNoQuestion("Proceed to sort these files?", ConsoleKey.N);
         if (proceed != ConsoleKey.Y) return;
@@ -49,8 +48,8 @@ public class IdentifyAndSortNewMediaProcessor(
 
         if (duplicates.Count > 0)
         {
-            Console.WriteLine($"Detected {duplicates.Count} duplicate file(s).");
-            ConsoleKey del = ConsoleHelper.AskYesNoQuestion("Would you like to delete them?", ConsoleKey.N);
+            Console.WriteLine($"  Detected {duplicates.Count} duplicate file(s).");
+            ConsoleKey del = ConsoleHelper.AskYesNoQuestion("Would you like to delete duplicates?", ConsoleKey.N);
             if (del == ConsoleKey.Y)
             {
                 Console.Write("Deleting duplicated files... ");

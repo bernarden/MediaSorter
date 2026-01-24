@@ -29,15 +29,10 @@ public class MediaSortingService(MediaSorterSettings settings) : IMediaSortingSe
         var duplicates = new ConcurrentBag<DuplicateFile>();
         if (files == null || files.Count == 0) return duplicates.ToList();
 
-        bool shouldRenameFiles = false;
         var mediaFilesToApplyOffset = files.Where(x => x.CreatedOn != null && x.CreatedOn.Source == CreatedOnSource.MetadataUtc).ToList();
         if (mediaFilesToApplyOffset.Any())
         {
             TimeSpan utcOffset = ConsoleHelper.GetVideoUtcOffsetFromUser();
-            ConsoleKey response = ConsoleHelper.AskYesNoQuestion(
-                $"Would you like to rename {mediaFilesToApplyOffset.Count} file(s) to yyyymmdd_hhmmss format?",
-                ConsoleKey.N);
-            shouldRenameFiles = response == ConsoleKey.Y;
             foreach (var mf in mediaFilesToApplyOffset)
             {
                 mf.SetCreatedOn(new CreatedOn(mf.CreatedOn!.Date + utcOffset, CreatedOnSource.MetadataLocal));
@@ -58,12 +53,11 @@ public class MediaSortingService(MediaSorterSettings settings) : IMediaSortingSe
                     return;
                 }
 
-                bool shouldRenameThisFile = shouldRenameFiles && file.CreatedOn.Source != CreatedOnSource.FileName;
-                MoveFile(file.FilePath, file.CreatedOn.Date, file.TargetSubFolder, shouldRenameThisFile, dateToExistingDirectoryMapping, duplicates);
+                MoveFile(file.FilePath, file.CreatedOn.Date, file.TargetSubFolder, dateToExistingDirectoryMapping, duplicates);
 
                 foreach (string relatedFilePath in file.RelatedFiles)
                 {
-                    MoveFile(relatedFilePath, file.CreatedOn.Date, file.TargetSubFolder, shouldRenameThisFile, dateToExistingDirectoryMapping, duplicates);
+                    MoveFile(relatedFilePath, file.CreatedOn.Date, file.TargetSubFolder, dateToExistingDirectoryMapping, duplicates);
                 }
             }
             catch (Exception e)
@@ -82,16 +76,14 @@ public class MediaSortingService(MediaSorterSettings settings) : IMediaSortingSe
         return [.. duplicates];
     }
 
-    private void MoveFile(string filePath, DateTime createdDateTime, string? targetSubFolder, bool shouldRenameFile, IDictionary<DateTime, string> dateToExistingDirectoryMapping, ConcurrentBag<DuplicateFile> duplicates)
+    private void MoveFile(string filePath, DateTime createdDateTime, string? targetSubFolder, IDictionary<DateTime, string> dateToExistingDirectoryMapping, ConcurrentBag<DuplicateFile> duplicates)
     {
         if (!dateToExistingDirectoryMapping.TryGetValue(createdDateTime.Date, out string? directoryName))
         {
             directoryName = createdDateTime.ToString(settings.FolderNameFormat, CultureInfo.InvariantCulture);
         }
 
-        string destinationFileName = shouldRenameFile
-            ? createdDateTime.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + Path.GetExtension(filePath).ToLowerInvariant()
-            : Path.GetFileName(filePath);
+        string destinationFileName = Path.GetFileName(filePath);
 
         string destinationFolderPath = Path.Combine(settings.Directory, directoryName);
         if (!string.IsNullOrEmpty(targetSubFolder))
@@ -99,7 +91,7 @@ public class MediaSortingService(MediaSorterSettings settings) : IMediaSortingSe
             destinationFolderPath = Path.Combine(destinationFolderPath, targetSubFolder);
         }
 
-        if (filePath.StartsWith(destinationFolderPath, StringComparison.OrdinalIgnoreCase) && !shouldRenameFile) return;
+        if (filePath.StartsWith(destinationFolderPath, StringComparison.OrdinalIgnoreCase)) return;
 
         // Don't move files that have been previously (manually?) put into a dated folder.
         if (IsAlreadySorted(filePath)) return;
