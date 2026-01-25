@@ -1,64 +1,49 @@
 using Microsoft.Extensions.Options;
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Threading;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
-using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 
 public interface IDirectoryIdentificationService
 {
-    DirectoryStructure IdentifyDirectoryStructure();
+    DirectoryStructure IdentifyDirectoryStructure(IProgress<double>? progress = null);
 }
 
 public class DirectoryIdentificationService(
     IDirectoryResolver directoryResolver,
     IOptions<MediaSorterOptions> options) : IDirectoryIdentificationService
 {
-    public DirectoryStructure IdentifyDirectoryStructure()
+    public DirectoryStructure IdentifyDirectoryStructure(IProgress<double>? progress = null)
     {
-        Console.Write("Identifying directory structure... ");
-        using ProgressBar progress = new();
-        int processedDirectoryCounter = 0;
         DirectoryStructure result = new();
-        ConcurrentDictionary<DateTime, ConcurrentBag<string>> ignoredFolderForDate = new();
+        var dateToExistingDirectoriesMapping = new Dictionary<DateTime, List<string>>();
         string[] directoryPaths = Directory.GetDirectories(options.Value.Directory);
-        foreach (string directoryPath in directoryPaths)
+        for (int i = 0; i < directoryPaths.Length; i++)
         {
-            ProcessDirectoryPath(directoryPath, result, ignoredFolderForDate);
-            Interlocked.Increment(ref processedDirectoryCounter);
-            progress.Report((double)processedDirectoryCounter / directoryPaths.Length);
+            string directoryPath = directoryPaths[i];
+            ProcessDirectoryPath(directoryPath, result, dateToExistingDirectoriesMapping);
+            progress?.Report((double)(i + 1) / directoryPaths.Length);
         }
 
-        progress.Dispose();
-        Console.WriteLine("Done.");
-
-        if (!ignoredFolderForDate.IsEmpty)
+        foreach ((var date, var existingDirectories) in dateToExistingDirectoriesMapping)
         {
-            Console.WriteLine("  Warning: Multiple directories mapped to the same dates (Only first discovery used):");
-            foreach (var ignoredFolders in ignoredFolderForDate.OrderBy(x => x.Key))
-            {
-                string usedDirName = Path.GetFileName(result.DateToExistingDirectoryMapping[ignoredFolders.Key]);
-                Console.WriteLine($"    [{ignoredFolders.Key:yyyy_MM_dd}] Target: '{usedDirName}'");
-                foreach (var ignoredFolder in ignoredFolders.Value)
-                {
-                    Console.WriteLine($"                 Ignore: '{ignoredFolder}'");
-                }
-            }
-            Console.WriteLine();
-        }
+            if (existingDirectories.Count <= 0) continue;
 
+            result.DateToExistingDirectoryMapping[date] = existingDirectories[0];
+
+            if (existingDirectories.Count > 1)
+                result.DateToIgnoredDirectoriesMapping[date] = existingDirectories.GetRange(1, existingDirectories.Count - 1);
+        }
         return result;
     }
 
     private void ProcessDirectoryPath(
         string directoryPath,
         DirectoryStructure result,
-        ConcurrentDictionary<DateTime, ConcurrentBag<string>> ignoredFolderForDate)
+        Dictionary<DateTime, List<string>> dateToExistingDirectoriesMapping)
     {
         DirectoryInfo directoryInfo = new(directoryPath);
         string directoryName = directoryInfo.Name;
@@ -72,14 +57,13 @@ public class DirectoryIdentificationService(
         {
             result.SortedFolders.Add(directoryPath);
             DateTime date = directoryDate.Value.Date;
-            if (result.DateToExistingDirectoryMapping.TryGetValue(date, out string? existingDirectoryPath))
+            if (dateToExistingDirectoriesMapping.TryGetValue(date, out List<string>? existingDirectories))
             {
-                var ignoredFolders = ignoredFolderForDate.GetOrAdd(date, _ => new ConcurrentBag<string>());
-                ignoredFolders.Add(directoryName);
+                existingDirectories.Add(directoryName);
             }
             else
             {
-                result.DateToExistingDirectoryMapping.Add(date, directoryPath);
+                dateToExistingDirectoriesMapping.Add(date, new List<string>() { directoryPath });
             }
         }
     }

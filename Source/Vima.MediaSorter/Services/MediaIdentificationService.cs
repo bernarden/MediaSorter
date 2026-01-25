@@ -7,34 +7,34 @@ using System.Threading;
 using System.Threading.Tasks;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Services.MediaFileHandlers;
-using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 
 public interface IMediaIdentificationService
 {
-    IdentifiedMedia Identify(IEnumerable<string> directoriesToScan);
+    IdentifiedMedia Identify(IEnumerable<string> directoriesToScan, IProgress<double>? progress = null);
 }
 
 public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFileHandlers) : IMediaIdentificationService
 {
-    public IdentifiedMedia Identify(IEnumerable<string> directoriesToScan)
+    public IdentifiedMedia Identify(IEnumerable<string> directoriesToScan, IProgress<double>? progress = null)
     {
-        Console.Write("Identifying your media... ");
-        using var progress = new ProgressBar();
+        List<string> filePaths = [.. directoriesToScan.SelectMany(Directory.EnumerateFiles)];
+        if (filePaths.Count == 0)
+        {
+            progress?.Report(1.0);
+            return new IdentifiedMedia();
+        }
+
         int processedFileCounter = 0;
         ConcurrentBag<MediaFile> mediaFiles = new();
         ConcurrentBag<string> ignoredFiles = new();
-        List<string> filePaths = [.. directoriesToScan.SelectMany(d => Directory.EnumerateFiles(d))];
         Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
         {
             ProcessFilePath(filePath, mediaFiles, ignoredFiles);
             Interlocked.Increment(ref processedFileCounter);
-            progress.Report((double)processedFileCounter / filePaths.Count);
+            progress?.Report((double)processedFileCounter / filePaths.Count);
         });
-
-        progress.Dispose();
-        Console.WriteLine("Done.");
 
         return new IdentifiedMedia
         {
