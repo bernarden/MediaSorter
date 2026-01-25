@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.UI;
@@ -21,14 +22,22 @@ public class IdentifyAndSortNewMediaProcessor(
 
     public void Process()
     {
-        var directoryStructure = directoryIdentifingService.IdentifyDirectoryStructure();
+        Console.Write("Identifying directory structure... ");
+        DirectoryStructure directoryStructure = ExecuteWithProgress(directoryIdentifingService.IdentifyDirectoryStructure);
+        Console.WriteLine("Done.");
 
+        ReportDirectoryConflicts(directoryStructure);
+
+
+        Console.Write("Identifying your media... ");
         IEnumerable<string> directoriesToScan =
         [
             options.Value.Directory,
             .. directoryStructure.UnsortedFolders,
         ];
-        var identified = mediaIdentifyingService.Identify(directoriesToScan);
+        var identified = ExecuteWithProgress(p => mediaIdentifyingService.Identify(directoriesToScan, p));
+        Console.WriteLine("Done.");
+
         if (identified.MediaFiles.Count == 0)
         {
             Console.WriteLine("No media files found.");
@@ -67,6 +76,31 @@ public class IdentifyAndSortNewMediaProcessor(
 
                 progress.Dispose();
                 Console.WriteLine("Done.");
+            }
+        }
+    }
+
+    private static T ExecuteWithProgress<T>(Func<IProgress<double>, T> serviceCall)
+    {
+        using var progress = new ProgressBar();
+        var progressReporter = new Progress<double>(progress.Report);
+        var result = serviceCall(progressReporter);
+        return result;
+    }
+
+    private static void ReportDirectoryConflicts(DirectoryStructure structure)
+    {
+        if (structure.DateToIgnoredDirectoriesMapping.Count == 0) return;
+
+        Console.WriteLine("  Warning: Multiple directories mapped to the same dates (Only first discovery used):");
+        foreach (var (date, ignoredPaths) in structure.DateToIgnoredDirectoriesMapping.OrderBy(x => x.Key))
+        {
+            string usedDir = Path.GetFileName(structure.DateToExistingDirectoryMapping[date]);
+            Console.WriteLine($"    [{date:yyyy_MM_dd}] Target: '{usedDir}'");
+
+            foreach (var ignored in ignoredPaths)
+            {
+                Console.WriteLine($"               Ignore: '{Path.GetFileName(ignored)}'");
             }
         }
     }
