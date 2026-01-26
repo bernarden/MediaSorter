@@ -8,15 +8,14 @@ namespace Vima.MediaSorter.Infrastructure;
 
 public interface IFileMover
 {
-    (MoveStatus Status, string? DestinationPath) Move(
-        string sourceFilePath, string targetDirectory, string targetFileName);
+    FileMove Move(string sourceFilePath, string targetDirectory, string targetFileName);
 }
 
 public class FileMover(IDuplicateDetector duplicateDetector) : IFileMover
 {
     private readonly ConcurrentDictionary<string, bool> _previouslyCreatedFolders = new();
 
-    public (MoveStatus Status, string? DestinationPath) Move(
+    public FileMove Move(
         string sourceFilePath, string targetDirectory, string targetFileName)
     {
         _previouslyCreatedFolders.GetOrAdd(targetDirectory, path =>
@@ -30,13 +29,13 @@ public class FileMover(IDuplicateDetector duplicateDetector) : IFileMover
             return ExecuteMoveWithRetries(sourceFilePath, targetPath);
 
         if (duplicateDetector.AreIdentical(sourceFilePath, targetPath))
-            return (MoveStatus.Duplicate, targetPath);
+            return new DuplicateDetectedFileMove(sourceFilePath, targetPath);
 
         string uniqueTargetPath = GenerateUniqueTargetPath(targetDirectory, targetFileName);
         return ExecuteMoveWithRetries(sourceFilePath, uniqueTargetPath);
     }
 
-    private (MoveStatus, string?) ExecuteMoveWithRetries(string source, string dest)
+    private static FileMove ExecuteMoveWithRetries(string source, string dest)
     {
         const int maxAttempts = 3;
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
@@ -44,7 +43,7 @@ public class FileMover(IDuplicateDetector duplicateDetector) : IFileMover
             try
             {
                 File.Move(source, dest);
-                return (MoveStatus.Success, null);
+                return new SuccessfulFileMove(source, dest);
             }
             catch (Exception ex) when (IsTransient(ex) && attempt < maxAttempts)
             {
@@ -53,10 +52,10 @@ public class FileMover(IDuplicateDetector duplicateDetector) : IFileMover
         }
 
         File.Move(source, dest);
-        return (MoveStatus.Success, null);
+        return new SuccessfulFileMove(source, dest);
     }
 
-    private bool IsTransient(Exception ex) => ex switch
+    private static bool IsTransient(Exception ex) => ex switch
     {
         IOException => true,
         UnauthorizedAccessException => true,
