@@ -9,18 +9,24 @@ namespace Vima.MediaSorter.Services;
 
 public interface IDirectoryIdentificationService
 {
-    DirectoryStructure IdentifyDirectoryStructure(IProgress<double>? progress = null);
+    DirectoryStructure Identify(IProgress<double>? progress = null);
 }
 
 public class DirectoryIdentificationService(
     IDirectoryResolver directoryResolver,
     IOptions<MediaSorterOptions> options) : IDirectoryIdentificationService
 {
-    public DirectoryStructure IdentifyDirectoryStructure(IProgress<double>? progress = null)
+    public DirectoryStructure Identify(IProgress<double>? progress = null)
     {
         DirectoryStructure result = new();
         var dateToExistingDirectoriesMapping = new Dictionary<DateTime, List<string>>();
         string[] directoryPaths = Directory.GetDirectories(options.Value.Directory);
+        if (directoryPaths.Length == 0)
+        {
+            progress?.Report(1.0);
+            return result;
+        }
+
         for (int i = 0; i < directoryPaths.Length; i++)
         {
             string directoryPath = directoryPaths[i];
