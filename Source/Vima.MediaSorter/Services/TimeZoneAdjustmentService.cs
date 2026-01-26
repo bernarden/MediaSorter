@@ -8,15 +8,15 @@ namespace Vima.MediaSorter.Services;
 
 public interface ITimeZoneAdjustmentService
 {
-    void ApplyOffsetsIfNeeded(IEnumerable<MediaFile> files);
+    void ApplyOffsetsIfNeeded(IEnumerable<MediaFileWithDate> files);
 }
 
 public class TimeZoneAdjustmentService : ITimeZoneAdjustmentService
 {
-    public void ApplyOffsetsIfNeeded(IEnumerable<MediaFile> files)
+    public void ApplyOffsetsIfNeeded(IEnumerable<MediaFileWithDate> files)
     {
         var targetFiles = files
-            .Where(f => f.CreatedOn?.Source == CreatedOnSource.MetadataUtc)
+            .Where(f => f.CreatedOn.Source == CreatedOnSource.MetadataUtc)
             .ToList();
 
         if (targetFiles.Count == 0) return;

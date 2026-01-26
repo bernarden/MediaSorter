@@ -14,7 +14,7 @@ namespace Vima.MediaSorter.Services;
 public interface IMediaSortingService
 {
     List<DuplicateFile> Sort(
-        IReadOnlyCollection<MediaFile> files,
+        IReadOnlyCollection<MediaFileWithDate> files,
         IDictionary<DateTime, string> dateToExistingDirectoryMapping
     );
 }
@@ -26,7 +26,7 @@ public class MediaSortingService(
     private readonly MediaSorterOptions _options = options.Value;
 
     public List<DuplicateFile> Sort(
-        IReadOnlyCollection<MediaFile> files,
+        IReadOnlyCollection<MediaFileWithDate> files,
         IDictionary<DateTime, string> dateToExistingDirectoryMapping)
     {
         if (files == null || files.Count == 0) return [];
@@ -51,17 +51,11 @@ public class MediaSortingService(
     }
 
     private void ProcessFile(
-        MediaFile file,
+        MediaFileWithDate file,
         IDictionary<DateTime, string> dateToExistingDirectoryMapping,
         ConcurrentBag<DuplicateFile> duplicates,
         ConcurrentBag<string> stepLogs)
     {
-        if (file.CreatedOn == null)
-        {
-            stepLogs.Add($"  Warning: No creation date detected: {Path.GetRelativePath(_options.Directory, file.FilePath)}");
-            return;
-        }
-
         var targetFolderPath = directoryResolver.GetTargetFolderPath(
             file.CreatedOn.Date, file.TargetSubFolder, dateToExistingDirectoryMapping);
 

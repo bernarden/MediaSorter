@@ -12,10 +12,11 @@ public class Cr3MediaFileHandler() : BaseMediaFileHandler(".cr3")
 {
     public override MediaFile Handle(string filePath)
     {
-        var mediaFile = new MediaFile(filePath);
         var createdOn = TryGetDateFromFileName(filePath);
         createdOn ??= GetCr3CreatedOn(filePath);
-        mediaFile.SetCreatedOn(createdOn);
+        MediaFile mediaFile = createdOn is null
+            ? new MediaFile(filePath)
+            : new MediaFileWithDate(filePath, createdOn);
         mediaFile.SetTargetSubFolder("raw");
         return mediaFile;
     }
