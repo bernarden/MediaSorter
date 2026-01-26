@@ -6,6 +6,7 @@ using System.Reflection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Services.MediaFileHandlers;
+using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter;
 
@@ -19,7 +20,6 @@ public class AppOrchestrator(
     IEnumerable<IMediaFileHandler> mediaFileHandlers,
     IOptions<MediaSorterOptions> options) : IAppOrchestrator
 {
-    private const string Separator = "===============================================================================";
     private const int ErrorExitCode = 1;
     private const int SuccessExitCode = 0;
     private readonly MediaSorterOptions _options = options.Value;
@@ -49,9 +49,9 @@ public class AppOrchestrator(
         catch (Exception ex)
         {
             Console.WriteLine();
-            Console.Error.WriteLine(Separator);
+            Console.Error.WriteLine(ConsoleHelper.Separator);
             Console.Error.WriteLine($"A critical error occurred: {ex.Message}");
-            Console.Error.WriteLine(Separator);
+            Console.Error.WriteLine(ConsoleHelper.Separator);
             return ErrorExitCode;
         }
         finally
@@ -73,23 +73,17 @@ public class AppOrchestrator(
             [var v] => $"v{v} (unknown)",
             _ => "v0.0.0 (unknown)",
         };
+        Console.WriteLine(ConsoleHelper.Separator);
+        Console.WriteLine($"                      Vima MediaSorter {versionInfo}");
+        Console.WriteLine(ConsoleHelper.Separator);
 
         var allExtensions = mediaFileHandlers
             .SelectMany(h => h.SupportedExtensions)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(e => e);
-
-        Console.WriteLine(Separator);
-        Console.WriteLine($"Vima MediaSorter {versionInfo}");
-        Console.WriteLine($"Processing Directory: {_options.Directory}");
-        Console.WriteLine(Separator);
-
-        Console.WriteLine("Configuration Details:");
-        Console.WriteLine($"  Folder Name Format: {_options.FolderNameFormat}");
-        Console.WriteLine($"  Supported Extensions: {string.Join(", ", allExtensions)}");
-
-        Console.WriteLine(Separator);
-        Console.WriteLine();
+        Console.WriteLine($"Directory:     {_options.Directory}");
+        Console.WriteLine($"Extensions:    {string.Join(", ", allExtensions)}");
+        Console.WriteLine($"Folder format: {_options.FolderNameFormat}");
     }
 
     private int ExecuteByOption(ProcessorOptions option)
@@ -101,20 +95,24 @@ public class AppOrchestrator(
             return ErrorExitCode;
         }
 
+        Console.WriteLine(ConsoleHelper.Separator);
         Console.WriteLine($"Executing: {processor.GetType().Name}");
+        Console.WriteLine(ConsoleHelper.Separator);
         processor.Process();
-        Console.WriteLine(Separator);
-        Console.WriteLine();
         return SuccessExitCode;
     }
 
     private static ProcessorOptions GetProcessorOption()
     {
-        Console.WriteLine("Select an option (Default is exit):");
-        Console.WriteLine($"  {(int)ProcessorOptions.Exit}. Exit.");
-        Console.WriteLine($"  {(int)ProcessorOptions.IdentifyAndSortNewMedia}. Identify and sort new media.");
+        Console.WriteLine(ConsoleHelper.Separator);
+        Console.WriteLine();
+        Console.WriteLine("Available actions:");
+        Console.WriteLine($"  [{(int)ProcessorOptions.IdentifyAndSortNewMedia}] Identify and sort new media");
+        Console.WriteLine($"  [{(int)ProcessorOptions.Exit}] Exit (default)");
+        Console.WriteLine();
         Console.Write("Enter choice: ");
         string? input = Console.ReadLine();
+        Console.WriteLine();
         if (int.TryParse(input, out int intChoice) &&
             Enum.IsDefined(typeof(ProcessorOptions), intChoice) &&
             intChoice != (int)ProcessorOptions.None)
