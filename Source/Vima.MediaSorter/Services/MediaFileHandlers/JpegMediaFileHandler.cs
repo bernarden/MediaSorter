@@ -12,10 +12,11 @@ public class JpegMediaFileHandler() : BaseMediaFileHandler(".jpg", ".jpeg")
 {
     public override MediaFile Handle(string filePath)
     {
-        var mediaFile = new MediaFile(filePath);
         var createdOn = TryGetDateFromFileName(filePath);
         createdOn ??= GetImageCreatedOnFromExif(filePath);
-        mediaFile.SetCreatedOn(createdOn);
+        MediaFile mediaFile = createdOn is null
+            ? new MediaFile(filePath)
+            : new MediaFileWithDate(filePath, createdOn);
         return mediaFile;
     }
 

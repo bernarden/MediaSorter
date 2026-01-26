@@ -38,24 +38,24 @@ public class IdentifyAndSortNewMediaProcessor(
         var identified = ExecuteWithProgress(p => mediaIdentifyingService.Identify(directoriesToScan, p));
         Console.WriteLine("Done.");
 
-        if (identified.MediaFiles.Count == 0)
+        if (identified.MediaFilesWithDates.Count == 0)
         {
             Console.WriteLine("No media files found.");
             return;
         }
 
         var associated = relatedFileDiscoveryService.AssociateRelatedFiles(
-            identified.MediaFiles, identified.IgnoredFiles);
+            identified.MediaFilesWithDates, identified.UnsupportedFiles);
         string associatedInfo = associated.AssociatedFiles.Count > 0 ? $" (+{associated.AssociatedFiles.Count} associated)" : "";
-        Console.WriteLine($"  Identified: {identified.MediaFiles.Count}{associatedInfo} | Ignored: {associated.RemainingIgnoredFiles.Count}");
+        Console.WriteLine($"  Identified: {identified.MediaFilesWithDates.Count}{associatedInfo} | Ignored: {associated.RemainingIgnoredFiles.Count}");
 
         ConsoleKey proceed = ConsoleHelper.AskYesNoQuestion("Proceed to sort these files?", ConsoleKey.N);
         if (proceed != ConsoleKey.Y) return;
 
-        timeZoneAdjusterService.ApplyOffsetsIfNeeded(identified.MediaFiles);
+        timeZoneAdjusterService.ApplyOffsetsIfNeeded(identified.MediaFilesWithDates);
 
         List<DuplicateFile> duplicates = mediaSortingService.Sort(
-            identified.MediaFiles,
+            identified.MediaFilesWithDates,
             directoryStructure.DateToExistingDirectoryMapping
         );
 

@@ -27,46 +27,46 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         }
 
         int processedFileCounter = 0;
-        ConcurrentBag<MediaFile> mediaFiles = new();
-        ConcurrentBag<MediaFile> undatedMediaFiles = new();
-        ConcurrentBag<string> ignoredFiles = new();
+        ConcurrentBag<MediaFileWithDate> mediaFilesWithDates = new();
+        ConcurrentBag<MediaFile> mediaFilesWithoutDates = new();
+        ConcurrentBag<string> unsupportedFiles = new();
         Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
         {
-            ProcessFilePath(filePath, mediaFiles, undatedMediaFiles, ignoredFiles);
+            ProcessFilePath(filePath, mediaFilesWithDates, mediaFilesWithoutDates, unsupportedFiles);
             Interlocked.Increment(ref processedFileCounter);
             progress?.Report((double)processedFileCounter / filePaths.Count);
         });
 
         return new IdentifiedMedia
         {
-            MediaFiles = [.. mediaFiles],
-            UndatedMediaFiles = [.. undatedMediaFiles],
-            IgnoredFiles = [.. ignoredFiles]
+            MediaFilesWithDates = [.. mediaFilesWithDates],
+            MediaFilesWithoutDates = [.. mediaFilesWithoutDates],
+            UnsupportedFiles = [.. unsupportedFiles]
         };
     }
 
     private void ProcessFilePath(
         string filePath,
-        ConcurrentBag<MediaFile> mediaFiles,
-        ConcurrentBag<MediaFile> undatedMediaFiles,
-        ConcurrentBag<string> ignoredFiles)
+        ConcurrentBag<MediaFileWithDate> mediaFilesWithDates,
+        ConcurrentBag<MediaFile> mediaFilesWithoutDates,
+        ConcurrentBag<string> unsupportedFiles)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         var handler = mediaFileHandlers.FirstOrDefault(h => h.CanHandle(ext));
         if (handler == null)
         {
-            ignoredFiles.Add(filePath);
+            unsupportedFiles.Add(filePath);
             return;
         }
 
         var mediaFile = handler.Handle(filePath);
-        if (mediaFile.CreatedOn != null)
+        if (mediaFile is MediaFileWithDate datedFile)
         {
-            mediaFiles.Add(mediaFile);
+            mediaFilesWithDates.Add(datedFile);
         }
         else
         {
-            undatedMediaFiles.Add(mediaFile);
+            mediaFilesWithoutDates.Add(mediaFile);
         }
     }
 }

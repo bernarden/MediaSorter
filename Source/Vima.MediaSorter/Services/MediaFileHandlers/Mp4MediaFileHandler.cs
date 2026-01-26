@@ -11,10 +11,11 @@ public class Mp4MediaFileHandler() : BaseMediaFileHandler(".mp4")
 {
     public override MediaFile Handle(string filePath)
     {
-        var mediaFile = new MediaFile(filePath);
         var createdOn = TryGetDateFromFileName(filePath);
         createdOn ??= GetVideoCreatedOn(filePath);
-        mediaFile.SetCreatedOn(createdOn);
+        MediaFile mediaFile = createdOn is null
+            ? new MediaFile(filePath)
+            : new MediaFileWithDate(filePath, createdOn);
         return mediaFile;
     }
 
