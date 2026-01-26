@@ -28,10 +28,11 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
 
         int processedFileCounter = 0;
         ConcurrentBag<MediaFile> mediaFiles = new();
+        ConcurrentBag<MediaFile> undatedMediaFiles = new();
         ConcurrentBag<string> ignoredFiles = new();
         Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
         {
-            ProcessFilePath(filePath, mediaFiles, ignoredFiles);
+            ProcessFilePath(filePath, mediaFiles, undatedMediaFiles, ignoredFiles);
             Interlocked.Increment(ref processedFileCounter);
             progress?.Report((double)processedFileCounter / filePaths.Count);
         });
@@ -39,22 +40,33 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         return new IdentifiedMedia
         {
             MediaFiles = [.. mediaFiles],
+            UndatedMediaFiles = [.. undatedMediaFiles],
             IgnoredFiles = [.. ignoredFiles]
         };
     }
 
-    private void ProcessFilePath(string filePath, ConcurrentBag<MediaFile> mediaFiles, ConcurrentBag<string> ignoredFiles)
+    private void ProcessFilePath(
+        string filePath,
+        ConcurrentBag<MediaFile> mediaFiles,
+        ConcurrentBag<MediaFile> undatedMediaFiles,
+        ConcurrentBag<string> ignoredFiles)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         var handler = mediaFileHandlers.FirstOrDefault(h => h.CanHandle(ext));
-        if (handler != null)
+        if (handler == null)
         {
-            var mediaFile = handler.Handle(filePath);
+            ignoredFiles.Add(filePath);
+            return;
+        }
+
+        var mediaFile = handler.Handle(filePath);
+        if (mediaFile.CreatedOn != null)
+        {
             mediaFiles.Add(mediaFile);
         }
         else
         {
-            ignoredFiles.Add(filePath);
+            undatedMediaFiles.Add(mediaFile);
         }
     }
 }
