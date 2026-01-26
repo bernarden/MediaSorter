@@ -23,7 +23,7 @@ public class IdentifyAndSortNewMediaProcessor(
     public void Process()
     {
         Console.WriteLine("[Step 1/2] Identification");
-        Console.WriteLine("-------------------------------------------------------------------------------");
+        Console.WriteLine(ConsoleHelper.TaskSeparator);
 
         var directoryStructure = ExecuteWithProgress("Identifying directories",
             directoryIdentifingService.Identify);
@@ -45,24 +45,24 @@ public class IdentifyAndSortNewMediaProcessor(
         Console.WriteLine($"  Sidecars:     {sidecarCount} related files");
         Console.WriteLine($"  Missing date: {missingDateCount} files (no metadata)");
         Console.WriteLine($"  Unsupported:  {unsupportedCount} files (skipped)");
-        ReportDiscoveryAlerts(directoryStructure, missingDateCount, unsupportedCount);
-
-        if (readyCount == 0)
-        {
-            Console.WriteLine();
-            Console.WriteLine("No new media files found to sort.");
-            return;
-        }
+        ReportDiscoveryAlerts(directoryStructure, missingDateCount);
 
         Console.WriteLine();
+        Console.WriteLine(ConsoleHelper.TaskSeparator);
         Console.WriteLine("[Step 2/2] Sorting");
-        Console.WriteLine("-------------------------------------------------------------------------------");
+        Console.WriteLine(ConsoleHelper.TaskSeparator);
 
         int totalFilesToMove = readyCount + sidecarCount;
         var targetFolderCount = identified.MediaFilesWithDates
             .Select(f => f.CreatedOn.Date)
             .Distinct()
             .Count();
+
+        if (totalFilesToMove == 0)
+        {
+            Console.WriteLine("No new media files found to sort.");
+            return;
+        }
 
         if (ConsoleHelper.AskYesNoQuestion($"Action: Sort {totalFilesToMove} file(s) into {targetFolderCount} date folder(s)?", ConsoleKey.N) != ConsoleKey.Y)
         {
@@ -84,10 +84,17 @@ public class IdentifyAndSortNewMediaProcessor(
             Console.WriteLine("Result: All files are already organised.");
         }
 
-        if (sortingResult.Errors.Any())
+        if (sortingResult.Errors.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"(!) {sortingResult.Errors.Count} file(s) failed due to errors.");
+
+            foreach (var error in sortingResult.Errors.Take(5))
+                Console.WriteLine($"    - {Path.GetFileName(error.SourcePath)}: {error.Exception.Message}");
+
+            if (sortingResult.Errors.Count > 5)
+                Console.WriteLine("    - ... (see logs for more)");
+
             Console.ResetColor();
         }
 
@@ -109,7 +116,7 @@ public class IdentifyAndSortNewMediaProcessor(
         return result;
     }
 
-    private static void ReportDiscoveryAlerts(DirectoryStructure structure, int missingDateCount, int unsupportedCount)
+    private static void ReportDiscoveryAlerts(DirectoryStructure structure, int missingDateCount)
     {
         var hasConflicts = structure.DateToIgnoredDirectoriesMapping.Count > 0;
         if (!hasConflicts && missingDateCount == 0) return;

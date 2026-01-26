@@ -5,6 +5,9 @@ namespace Vima.MediaSorter.UI;
 
 public class ConsoleHelper
 {
+    public const string Separator = "================================================================================";
+    public const string TaskSeparator = "--------------------------------------------------------------------------------";
+
     public static ConsoleKey AskYesNoQuestion(string question, ConsoleKey? defaultAnswer = null)
     {
         if (defaultAnswer == null)
