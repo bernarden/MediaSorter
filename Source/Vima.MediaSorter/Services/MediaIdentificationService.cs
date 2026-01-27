@@ -29,10 +29,11 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         int processedFileCounter = 0;
         ConcurrentBag<MediaFileWithDate> mediaFilesWithDates = new();
         ConcurrentBag<MediaFile> mediaFilesWithoutDates = new();
+        ConcurrentBag<FileIdentificationError> erroredFiles = new();
         ConcurrentBag<string> unsupportedFiles = new();
         Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
         {
-            ProcessFilePath(filePath, mediaFilesWithDates, mediaFilesWithoutDates, unsupportedFiles);
+            ProcessFilePath(filePath, mediaFilesWithDates, mediaFilesWithoutDates, erroredFiles, unsupportedFiles);
             Interlocked.Increment(ref processedFileCounter);
             progress?.Report((double)processedFileCounter / filePaths.Count);
         });
@@ -41,6 +42,7 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         {
             MediaFilesWithDates = [.. mediaFilesWithDates],
             MediaFilesWithoutDates = [.. mediaFilesWithoutDates],
+            ErroredFiles = [.. erroredFiles],
             UnsupportedFiles = [.. unsupportedFiles]
         };
     }
@@ -49,6 +51,7 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         string filePath,
         ConcurrentBag<MediaFileWithDate> mediaFilesWithDates,
         ConcurrentBag<MediaFile> mediaFilesWithoutDates,
+        ConcurrentBag<FileIdentificationError> erroredFiles,
         ConcurrentBag<string> unsupportedFiles)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
@@ -59,14 +62,21 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
             return;
         }
 
-        var mediaFile = handler.Handle(filePath);
-        if (mediaFile is MediaFileWithDate datedFile)
+        try
         {
-            mediaFilesWithDates.Add(datedFile);
+            var mediaFile = handler.Handle(filePath);
+            if (mediaFile is MediaFileWithDate datedFile)
+            {
+                mediaFilesWithDates.Add(datedFile);
+            }
+            else
+            {
+                mediaFilesWithoutDates.Add(mediaFile);
+            }
         }
-        else
+        catch (Exception e)
         {
-            mediaFilesWithoutDates.Add(mediaFile);
+            erroredFiles.Add(new FileIdentificationError(filePath, e));
         }
     }
 }
