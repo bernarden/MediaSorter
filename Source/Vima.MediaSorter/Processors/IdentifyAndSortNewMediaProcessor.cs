@@ -40,12 +40,21 @@ public class IdentifyAndSortNewMediaProcessor(
         var readyCount = identified.MediaFilesWithDates.Count;
         var sidecarCount = associated.AssociatedFiles.Count;
         var missingDateCount = identified.MediaFilesWithoutDates.Count;
+        var identificationErrorCount = identified.ErroredFiles.Count;
         var unsupportedCount = associated.RemainingIgnoredFiles.Count;
         Console.WriteLine($"  New media:    {readyCount} files");
         Console.WriteLine($"  Sidecars:     {sidecarCount} related files");
         Console.WriteLine($"  Missing date: {missingDateCount} files (no metadata)");
         Console.WriteLine($"  Unsupported:  {unsupportedCount} files (skipped)");
-        ReportDiscoveryAlerts(directoryStructure, missingDateCount);
+
+        if (identificationErrorCount > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  Errors:       {identificationErrorCount} files (failed to open/parse)");
+            Console.ResetColor();
+        }
+
+        ReportDiscoveryAlerts(directoryStructure, missingDateCount, identified.ErroredFiles);
 
         Console.WriteLine();
         Console.WriteLine(ConsoleHelper.TaskSeparator);
@@ -87,7 +96,7 @@ public class IdentifyAndSortNewMediaProcessor(
         if (sortingResult.Errors.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"(!) {sortingResult.Errors.Count} file(s) failed due to errors.");
+            Console.WriteLine($"(!) {sortingResult.Errors.Count} file(s) failed due to errors:");
 
             foreach (var error in sortingResult.Errors.Take(5))
                 Console.WriteLine($"    - {Path.GetFileName(error.SourcePath)}: {error.Exception.Message}");
@@ -116,10 +125,13 @@ public class IdentifyAndSortNewMediaProcessor(
         return result;
     }
 
-    private static void ReportDiscoveryAlerts(DirectoryStructure structure, int missingDateCount)
+    private static void ReportDiscoveryAlerts(
+         DirectoryStructure structure,
+         int missingDateCount,
+         IReadOnlyList<FileIdentificationError> identificationErrors)
     {
         var hasConflicts = structure.DateToIgnoredDirectoriesMapping.Count > 0;
-        if (!hasConflicts && missingDateCount == 0) return;
+        if (!hasConflicts && missingDateCount == 0 && identificationErrors.Count == 0) return;
 
         Console.WriteLine();
         Console.WriteLine("(!) Discovery Alerts:");
@@ -134,6 +146,20 @@ public class IdentifyAndSortNewMediaProcessor(
         if (missingDateCount > 0)
         {
             Console.WriteLine($"    - {missingDateCount} file(s) skipped: Supported file type, but no date metadata found.");
+        }
+
+        if (identificationErrors.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"    - {identificationErrors.Count} file(s) could not be read due to errors:");
+
+            foreach (var error in identificationErrors.Take(5))
+                Console.WriteLine($"      - {Path.GetFileName(error.FilePath)}: {error.Exception.Message}");
+
+            if (identificationErrors.Count > 5)
+                Console.WriteLine("      - ... (see logs for more)");
+
+            Console.ResetColor();
         }
     }
 
