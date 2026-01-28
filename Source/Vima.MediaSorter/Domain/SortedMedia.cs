@@ -4,7 +4,7 @@ namespace Vima.MediaSorter.Domain;
 
 public class SortedMedia
 {
-    public List<SuccessfulFileMove> Moved { get; init; } = [];
-    public List<DuplicateDetectedFileMove> Duplicates { get; init; } = [];
-    public List<ErroredFileMove> Errors { get; init; } = [];
+    public IReadOnlyList<SuccessfulFileMove> Moved { get; init; } = [];
+    public IReadOnlyList<DuplicateDetectedFileMove> Duplicates { get; init; } = [];
+    public IReadOnlyList<ErroredFileMove> Errors { get; init; } = [];
 }

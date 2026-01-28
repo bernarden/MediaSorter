@@ -55,6 +55,7 @@ public static class Program
         services.AddTransient<IRelatedFilesDiscoveryService, RelatedFilesDiscoveryService>();
         services.AddTransient<IMediaSortingService, MediaSortingService>();
         services.AddTransient<ITimeZoneAdjustmentService, TimeZoneAdjustmentService>();
+        services.AddTransient<IAuditLogService, AuditLogService>();
 
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Cr3MediaFileHandler>();
