@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
@@ -115,13 +116,16 @@ public class IdentifyAndSortNewMediaProcessor(
     private static T ExecuteWithProgress<T>(string label, Func<IProgress<double>, T> serviceCall)
     {
         Console.Write($"{label}... ");
+        var sw = Stopwatch.StartNew();
         T result;
         using (var progress = new ProgressBar())
         {
             var progressReporter = new Progress<double>(progress.Report);
             result = serviceCall(progressReporter);
         }
-        Console.WriteLine("Done.");
+        sw.Stop();
+        string timeTaken = sw.Elapsed.TotalSeconds > 1 ? $"{sw.Elapsed.TotalSeconds:N1}s" : $"{sw.Elapsed.TotalMilliseconds:N0}ms";
+        Console.WriteLine($"Done ({timeTaken}).");
         return result;
     }
 
