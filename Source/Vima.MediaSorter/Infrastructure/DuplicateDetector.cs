@@ -1,10 +1,13 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using System.Security.Cryptography;
 
 namespace Vima.MediaSorter.Infrastructure;
 
 public interface IDuplicateDetector
 {
     bool AreIdentical(string path1, string path2);
+    string GetFileHash(string path);
 }
 
 public class DuplicateDetector : IDuplicateDetector
@@ -13,16 +16,47 @@ public class DuplicateDetector : IDuplicateDetector
     {
         var f1 = new FileInfo(path1);
         var f2 = new FileInfo(path2);
-        if (f1.Length != f2.Length) return false;
+        if (f1.Length != f2.Length)
+            return false;
 
-        using var s1 = new FileStream(path1, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using var s2 = new FileStream(path2, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var s1 = new FileStream(
+            path1,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 65536
+        );
+        using var s2 = new FileStream(
+            path2,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 65536
+        );
 
         int b1;
         while ((b1 = s1.ReadByte()) != -1)
         {
-            if (b1 != s2.ReadByte()) return false;
+            if (b1 != s2.ReadByte())
+                return false;
         }
         return true;
+    }
+
+    public string GetFileHash(string path)
+    {
+        var file = new FileInfo(path);
+        if (!file.Exists)
+            return string.Empty;
+
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 65536
+        );
+        byte[] hashBytes = MD5.HashData(stream);
+        return $"{file.Length}-{Convert.ToHexString(hashBytes)}";
     }
 }

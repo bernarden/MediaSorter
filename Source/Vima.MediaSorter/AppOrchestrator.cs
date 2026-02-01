@@ -108,6 +108,7 @@ public class AppOrchestrator(
         Console.WriteLine();
         Console.WriteLine("Available actions:");
         Console.WriteLine($"  [{(int)ProcessorOptions.IdentifyAndSortNewMedia}] Identify and sort new media");
+        Console.WriteLine($"  [{(int)ProcessorOptions.FindDuplicates}] Find duplicates");
         Console.WriteLine($"  [{(int)ProcessorOptions.Exit}] Exit (default)");
         Console.WriteLine();
         Console.Write("Enter choice: ");
