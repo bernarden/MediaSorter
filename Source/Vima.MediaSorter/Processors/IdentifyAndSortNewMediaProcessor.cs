@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
@@ -31,11 +30,11 @@ public class IdentifyAndSortNewMediaProcessor(
             Console.WriteLine("[Step 1/2] Identification");
             Console.WriteLine(ConsoleHelper.TaskSeparator);
 
-            var directoryStructure = ExecuteWithProgress("Identifying directories",
+            var directoryStructure = ConsoleHelper.ExecuteWithProgress("Identifying directories",
                 directoryIdentifingService.Identify);
 
             IEnumerable<string> directoriesToScan = [options.Value.Directory, .. directoryStructure.UnsortedFolders];
-            var identified = ExecuteWithProgress("Identifying media files",
+            var identified = ConsoleHelper.ExecuteWithProgress("Identifying media files",
                 p => mediaIdentifyingService.Identify(directoriesToScan, p));
 
             var associated = relatedFileDiscoveryService.AssociateRelatedFiles(
@@ -90,7 +89,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
             timeZoneAdjusterService.ApplyOffsetsIfNeeded(identified.MediaFilesWithDates);
 
-            var sortingResult = ExecuteWithProgress("Status: Sorting",
+            var sortingResult = ConsoleHelper.ExecuteWithProgress("Status: Sorting",
                 p => mediaSortingService.Sort(identified.MediaFilesWithDates, directoryStructure.DateToExistingDirectoryMapping, p));
             LogSorting(sortingResult);
 
@@ -130,22 +129,6 @@ public class IdentifyAndSortNewMediaProcessor(
             Console.WriteLine($"Details logged to: {logPath}");
             Console.ResetColor();
         }
-    }
-
-    private static T ExecuteWithProgress<T>(string label, Func<IProgress<double>, T> serviceCall)
-    {
-        Console.Write($"{label}... ");
-        var sw = Stopwatch.StartNew();
-        T result;
-        using (var progress = new ProgressBar())
-        {
-            var progressReporter = new Progress<double>(progress.Report);
-            result = serviceCall(progressReporter);
-        }
-        sw.Stop();
-        string timeTaken = sw.Elapsed.TotalSeconds > 1 ? $"{sw.Elapsed.TotalSeconds:N1}s" : $"{sw.Elapsed.TotalMilliseconds:N0}ms";
-        Console.WriteLine($"Done ({timeTaken}).");
-        return result;
     }
 
     private static void ReportDiscoveryAlerts(
@@ -201,7 +184,7 @@ public class IdentifyAndSortNewMediaProcessor(
         var deletedFiles = new List<string>();
         var deletionErrors = new List<(string FilePath, Exception Exception)>();
 
-        ExecuteWithProgress("  Status: Cleaning up", p =>
+        ConsoleHelper.ExecuteWithProgress("  Status: Cleaning up", p =>
         {
             for (int i = 0; i < duplicates.Count; i++)
             {
@@ -288,7 +271,7 @@ public class IdentifyAndSortNewMediaProcessor(
                 identified.ErroredFiles.Select(err => $"ERROR: {err.FilePath} (Exception: {err.Exception.Message})"));
         }
 
-        auditLogService.WriteLine("\n" + new string('-', 80) + "\n");
+        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
     }
 
     private void LogSorting(SortedMedia result)
@@ -316,7 +299,7 @@ public class IdentifyAndSortNewMediaProcessor(
                 result.Errors.Select(err => $"FAIL:  {err.SourcePath} -> Reason: {err.Exception.Message}"));
         }
 
-        auditLogService.WriteLine("\n" + new string('-', 80) + "\n");
+        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
     }
 
     private void LogDeletedDuplicates(
@@ -339,12 +322,12 @@ public class IdentifyAndSortNewMediaProcessor(
                 errors.Select(err => $"ERROR:   {err.FilePath} -> Reason: {err.Exception.Message}"));
         }
 
-        auditLogService.WriteLine("\n" + new string('-', 80) + "\n");
+        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
     }
 
     private void LogError(string message, Exception ex)
     {
         auditLogService.WriteError(message, ex);
-        auditLogService.WriteLine("\n" + new string('-', 80) + "\n");
+        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Text;
 
 namespace Vima.MediaSorter.UI;
@@ -110,5 +111,19 @@ public class ConsoleHelper
             Console.SetCursorPosition(0, Console.CursorTop);
             Console.Write($"UTC offset for media files: {offset}");
         }
+    }
+
+    public static T ExecuteWithProgress<T>(string label, Func<IProgress<double>, T> serviceCall)
+    {
+        Console.Write($"{label}... ");
+        var sw = Stopwatch.StartNew();
+        T result;
+        using (var progress = new ProgressBar())
+        {
+            result = serviceCall(new Progress<double>(progress.Report));
+        }
+        sw.Stop();
+        Console.WriteLine($"Done ({sw.Elapsed.TotalSeconds:N1}s).");
+        return result;
     }
 }

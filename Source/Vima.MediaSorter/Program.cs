@@ -49,6 +49,7 @@ public static class Program
 
         services.AddTransient<IAppOrchestrator, AppOrchestrator>();
         services.AddTransient<IProcessor, IdentifyAndSortNewMediaProcessor>();
+        services.AddTransient<IProcessor, FindDuplicatesProcessor>();
 
         services.AddTransient<IDirectoryIdentificationService, DirectoryIdentificationService>();
         services.AddTransient<IMediaIdentificationService, MediaIdentificationService>();
