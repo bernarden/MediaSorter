@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Services;
+using Vima.MediaSorter.Services.MediaFileHandlers;
 using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Processors;
@@ -15,6 +16,7 @@ public class IdentifyAndSortNewMediaProcessor(
     ITimeZoneAdjustmentService timeZoneAdjusterService,
     IMediaSortingService mediaSortingService,
     IRelatedFilesDiscoveryService relatedFileDiscoveryService,
+    IEnumerable<IMediaFileHandler> mediaFileHandlers,
     IAuditLogService auditLogService,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
@@ -27,6 +29,8 @@ public class IdentifyAndSortNewMediaProcessor(
 
         try
         {
+            OutputConfiguration();
+
             Console.WriteLine("[Step 1/2] Identification");
             Console.WriteLine(ConsoleHelper.TaskSeparator);
 
@@ -129,6 +133,20 @@ public class IdentifyAndSortNewMediaProcessor(
             Console.WriteLine($"Details logged to: {logPath}");
             Console.ResetColor();
         }
+    }
+
+    private void OutputConfiguration()
+    {
+        var allExtensions = mediaFileHandlers
+            .SelectMany(h => h.SupportedExtensions)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(e => e);
+
+        Console.WriteLine($"Configuration:");
+        Console.WriteLine($"  Directory:      {options.Value.Directory}");
+        Console.WriteLine($"  Extensions:     {string.Join(", ", allExtensions)}");
+        Console.WriteLine($"  Folder format:  {options.Value.FolderNameFormat}");
+        Console.WriteLine();
     }
 
     private static void ReportDiscoveryAlerts(

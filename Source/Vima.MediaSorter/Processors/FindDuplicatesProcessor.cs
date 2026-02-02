@@ -29,6 +29,8 @@ public class FindDuplicatesProcessor(
     {
         string logPath = auditLogService.Initialise();
 
+        OutputConfiguration();
+
         var (visualHasher, threshold) = SelectVisualHasher();
 
         try
@@ -61,6 +63,13 @@ public class FindDuplicatesProcessor(
             Console.WriteLine($"Details logged to: {logPath}");
             Console.ResetColor();
         }
+    }
+
+    private void OutputConfiguration()
+    {
+        Console.WriteLine($"Configuration:");
+        Console.WriteLine($"  Directory:      {options.Value.Directory}");
+        Console.WriteLine();
     }
 
     private (
@@ -194,6 +203,7 @@ public class FindDuplicatesProcessor(
         var choice = ConsoleHelper.PromptForEnum("Select mode", (VisualHasherType)0);
         if ((int)choice == 0)
         {
+            Console.WriteLine();
             return (null, 0);
         }
 
@@ -201,6 +211,7 @@ public class FindDuplicatesProcessor(
         if (selectedHasher == null)
         {
             Console.WriteLine($"(!) Hasher {choice} not registered. Defaulting to Exact.");
+            Console.WriteLine();
             return (null, 0);
         }
 
@@ -211,6 +222,7 @@ public class FindDuplicatesProcessor(
             threshold = recommended;
         }
 
+        Console.WriteLine();
         return (selectedHasher, Math.Clamp(threshold, 0, 64));
     }
 
@@ -267,7 +279,6 @@ public class FindDuplicatesProcessor(
             auditLogService.WriteLine($"\nExact Set ({set.Count} files):");
             auditLogService.WriteBulletPoints(set, 1);
         }
-
 
         if (visualHasher != null)
         {

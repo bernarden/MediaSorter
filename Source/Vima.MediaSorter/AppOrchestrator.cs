@@ -61,7 +61,7 @@ public class AppOrchestrator(
         }
     }
 
-    private void OutputHeader(IEnumerable<IMediaFileHandler> mediaFileHandlers)
+    private static void OutputHeader(IEnumerable<IMediaFileHandler> mediaFileHandlers)
     {
         var assemblyVersion = Assembly
             .GetExecutingAssembly()
@@ -76,14 +76,6 @@ public class AppOrchestrator(
         Console.WriteLine(ConsoleHelper.Separator);
         Console.WriteLine($"                      Vima MediaSorter {versionInfo}");
         Console.WriteLine(ConsoleHelper.Separator);
-
-        var allExtensions = mediaFileHandlers
-            .SelectMany(h => h.SupportedExtensions)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(e => e);
-        Console.WriteLine($"Directory:     {_options.Directory}");
-        Console.WriteLine($"Extensions:    {string.Join(", ", allExtensions)}");
-        Console.WriteLine($"Folder format: {_options.FolderNameFormat}");
     }
 
     private int ExecuteByOption(ProcessorOptions option)
@@ -95,16 +87,17 @@ public class AppOrchestrator(
             return ErrorExitCode;
         }
 
+        Console.WriteLine();
         Console.WriteLine(ConsoleHelper.Separator);
         Console.WriteLine($"Executing: {processor.GetType().Name}");
         Console.WriteLine(ConsoleHelper.Separator);
         processor.Process();
+        Console.WriteLine(ConsoleHelper.Separator);
         return SuccessExitCode;
     }
 
     private static ProcessorOptions GetProcessorOption()
     {
-        Console.WriteLine(ConsoleHelper.Separator);
         Console.WriteLine();
         Console.WriteLine("Available actions:");
         Console.WriteLine($"  [{(int)ProcessorOptions.IdentifyAndSortNewMedia}] Identify and sort new media");
