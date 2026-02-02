@@ -111,16 +111,6 @@ public class AppOrchestrator(
         Console.WriteLine($"  [{(int)ProcessorOptions.FindDuplicates}] Find duplicates");
         Console.WriteLine($"  [{(int)ProcessorOptions.Exit}] Exit (default)");
         Console.WriteLine();
-        Console.Write("Enter choice: ");
-        string? input = Console.ReadLine();
-        Console.WriteLine();
-        if (int.TryParse(input, out int intChoice) &&
-            Enum.IsDefined(typeof(ProcessorOptions), intChoice) &&
-            intChoice != (int)ProcessorOptions.None)
-        {
-            return (ProcessorOptions)intChoice;
-        }
-
-        return ProcessorOptions.Exit;
+        return ConsoleHelper.PromptForEnum("Enter choice", ProcessorOptions.Exit);
     }
 }

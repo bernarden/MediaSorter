@@ -4,6 +4,7 @@ using System.CommandLine;
 using System.IO;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
+using Vima.MediaSorter.Infrastructure.Hashers;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.Services.MediaFileHandlers;
@@ -65,6 +66,10 @@ public static class Program
         services.AddTransient<IDuplicateDetector, DuplicateDetector>();
         services.AddTransient<IFileMover, FileMover>();
         services.AddTransient<IDirectoryResolver, DirectoryResolver>();
+        services.AddSingleton<IFileHasher, Md5FileHasher>();
+        services.AddSingleton<IVisualFileHasher, AverageVisualFileHasher>();
+        services.AddSingleton<IVisualFileHasher, DifferenceVisualFileHasher>();
+        services.AddSingleton<IVisualFileHasher, PerceptualVisualFileHasher>();
 
         return services.BuildServiceProvider();
     }
