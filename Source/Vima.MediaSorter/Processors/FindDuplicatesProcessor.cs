@@ -4,121 +4,58 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Vima.MediaSorter.Domain;
-using Vima.MediaSorter.Infrastructure;
+using Vima.MediaSorter.Infrastructure.Hashers;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Processors;
 
 public class FindDuplicatesProcessor(
-    IDuplicateDetector duplicateDetector,
+    IFileHasher fileHasher,
+    IEnumerable<IVisualFileHasher> visualHashers,
     IAuditLogService auditLogService,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
+    private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".bmp" };
+
     public ProcessorOptions Option => ProcessorOptions.FindDuplicates;
 
     public void Process()
     {
         string logPath = auditLogService.Initialise();
 
+        var (visualHasher, threshold) = SelectVisualHasher();
+
         try
         {
             Console.WriteLine("[Step 1/1] Duplicate Detection");
             Console.WriteLine(ConsoleHelper.TaskSeparator);
 
-            ConcurrentBag<(string Path, Exception Ex)> errors = new();
-            ConcurrentDictionary<string, string> hashes = new();
+            List<string> allFiles = Directory
+                .EnumerateFiles(options.Value.Directory, "*", SearchOption.AllDirectories)
+                .ToList();
 
-            var (duplicates, totalFilesChecked) = ConsoleHelper.ExecuteWithProgress(
-                "Scanning for duplicates",
-                p =>
-                {
-                    var allFiles = Directory
-                        .EnumerateFiles(options.Value.Directory, "*", SearchOption.AllDirectories)
-                        .ToList();
+            var (visualHashes, binaryHashes, errors) = GenerateHashes(visualHasher, allFiles);
 
-                    var sizeGroups = allFiles
-                        .Select(f => new FileInfo(f))
-                        .GroupBy(f => f.Length)
-                        .Where(g => g.Count() > 1)
-                        .ToList();
-
-                    int processedSizeGroupCounter = 0;
-                    ConcurrentBag<List<string>> result = new();
-                    Parallel.ForEach(
-                        sizeGroups,
-                        new() { MaxDegreeOfParallelism = 25 },
-                        sizeGroup =>
-                        {
-                            List<string> pathsInSizeGroup = sizeGroup
-                                .Select(f => f.FullName)
-                                .ToList();
-                            var duplicateSets = pathsInSizeGroup
-                                .GroupBy(path => GetHashSafely(path, hashes, errors))
-                                .Where(g => g.Count() > 1);
-
-                            foreach (var duplicateSet in duplicateSets)
-                            {
-                                result.Add([.. duplicateSet]);
-                            }
-
-                            Interlocked.Increment(ref processedSizeGroupCounter);
-                            p.Report((double)processedSizeGroupCounter / sizeGroups.Count);
-                        }
-                    );
-
-                    return (result.ToList(), allFiles.Count);
-                }
+            var (exactDuplicates, visualDuplicates) = ClusterDuplicates(
+                threshold,
+                visualHashes,
+                binaryHashes
             );
 
-            LogDuplicates(duplicates, errors);
+            LogDuplicates(exactDuplicates, visualDuplicates, errors, visualHasher, threshold);
 
-            Console.WriteLine();
-            Console.WriteLine("Analysis Result:");
-            int duplicateSetsCount = duplicates.Count;
-            int totalFilesInSets = duplicates.Sum(d => d.Count);
-            int redundantFileCount = totalFilesInSets - duplicateSetsCount;
-
-            Console.WriteLine($"  Files scanned:   {totalFilesChecked}");
-            Console.WriteLine($"  Duplicate sets:  {duplicateSetsCount}");
-            Console.WriteLine($"  Redundant files: {redundantFileCount} (safe to delete)");
-
-            if (!errors.IsEmpty)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"  Errors:         {errors.Count} files (skipped)");
-                Console.ResetColor();
-            }
-
-            if (!errors.IsEmpty)
-            {
-                Console.WriteLine();
-                Console.WriteLine("(!) Discovery Alerts:");
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(
-                    $"    - {errors.Count} file(s) could not be read due to permissions or locks:"
-                );
-                foreach (var error in errors.Take(5))
-                    Console.WriteLine(
-                        $"      - {Path.GetFileName(error.Path)}: {error.Ex.Message}"
-                    );
-
-                if (errors.Count > 5)
-                    Console.WriteLine("      - ... (see logs for more)");
-                Console.ResetColor();
-            }
-
-            Console.WriteLine();
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
-            Console.WriteLine($"Processing complete. Audit Log: {logPath}");
+            var allDuplicates = exactDuplicates.Concat(visualDuplicates).ToList();
+            DisplayFinalSummary(allFiles, allDuplicates, errors, logPath);
         }
         catch (Exception ex)
         {
-            LogError("A critical error occurred during duplicate scanning.", ex);
+            LogError("A critical error occurred.", ex);
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"\n[FATAL ERROR] {ex.Message}");
             Console.WriteLine($"Details logged to: {logPath}");
@@ -126,49 +63,233 @@ public class FindDuplicatesProcessor(
         }
     }
 
-    private string GetHashSafely(
-        string path,
-        ConcurrentDictionary<string, string> cache,
+    private (
+        ConcurrentDictionary<string, ulong> visualHashes,
+        ConcurrentDictionary<string, string> binaryHashes,
         ConcurrentBag<(string Path, Exception Ex)> errors
+    ) GenerateHashes(IVisualFileHasher? visualHasher, List<string> allFiles)
+    {
+        return ConsoleHelper.ExecuteWithProgress(
+            "Generating hashes",
+            p =>
+            {
+                int processed = 0;
+                ConcurrentDictionary<string, ulong> visualHashes = new();
+                ConcurrentDictionary<string, string> binaryHashes = new();
+                ConcurrentBag<(string Path, Exception Ex)> errors = new();
+                Parallel.ForEach(
+                    allFiles,
+                    new ParallelOptions { MaxDegreeOfParallelism = 25 },
+                    path =>
+                    {
+                        try
+                        {
+                            var ext = Path.GetExtension(path).ToLower();
+                            if (visualHasher != null && ImageExtensions.Contains(ext))
+                            {
+                                visualHashes[path] = visualHasher.GetHash(path);
+                            }
+                            else
+                            {
+                                binaryHashes[path] = fileHasher.GetHash(path);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add((path, ex));
+                        }
+
+                        var current = Interlocked.Increment(ref processed);
+                        if (current % 20 == 0)
+                            p.Report((double)current / allFiles.Count);
+                    }
+                );
+
+                return (visualHashes, binaryHashes, errors);
+            }
+        );
+    }
+
+    private static (
+        List<List<string>> binaryDuplicates,
+        List<List<string>> visualDuplicates
+    ) ClusterDuplicates(
+        int threshold,
+        ConcurrentDictionary<string, ulong> visualHashes,
+        ConcurrentDictionary<string, string> binaryHashes
     )
     {
-        try
+        return ConsoleHelper.ExecuteWithProgress(
+            "Clustering duplicates",
+            p =>
+            {
+                List<List<string>> binaryDuplicates = new();
+                List<List<string>> visualDuplicates = new();
+
+                var binaryGroups = binaryHashes.GroupBy(x => x.Value).Where(g => g.Count() > 1);
+                foreach (var group in binaryGroups)
+                {
+                    binaryDuplicates.Add([.. group.Select(x => x.Key)]);
+                }
+
+                if (!visualHashes.IsEmpty)
+                {
+                    var paths = visualHashes.Keys.ToList();
+                    var processed = new HashSet<string>();
+
+                    for (int i = 0; i < paths.Count; i++)
+                    {
+                        if (!processed.Contains(paths[i]))
+                        {
+                            var currentSet = new List<string> { paths[i] };
+                            ulong h1 = visualHashes[paths[i]];
+
+                            for (int j = i + 1; j < paths.Count; j++)
+                            {
+                                if (processed.Contains(paths[j]))
+                                    continue;
+
+                                var h2 = visualHashes[paths[j]];
+                                if (BitOperations.PopCount(h1 ^ h2) <= threshold)
+                                {
+                                    currentSet.Add(paths[j]);
+                                    processed.Add(paths[j]);
+                                }
+                            }
+
+                            if (currentSet.Count > 1)
+                                visualDuplicates.Add(currentSet);
+                            processed.Add(paths[i]);
+                        }
+
+                        p.Report((double)i / paths.Count);
+                    }
+                }
+
+                p.Report(1.0);
+                return (binaryDuplicates, visualDuplicates);
+            }
+        );
+    }
+
+    private (IVisualFileHasher? visualHasher, int threshold) SelectVisualHasher()
+    {
+        Console.WriteLine("Duplicate Detection Modes:");
+        Console.WriteLine(
+            "  [0] Exact: Byte-for-byte match. Fastest; misses resized/edited images."
+        );
+        Console.WriteLine(
+            $"  [{(int)VisualHasherType.Average}] Average: High speed. Best for near-identical copies."
+        );
+        Console.WriteLine(
+            $"  [{(int)VisualHasherType.Difference}] Difference: Balanced. Great for finding resized/compressed versions."
+        );
+        Console.WriteLine(
+            $"  [{(int)VisualHasherType.Perceptual}] Perceptual: High precision. Finds matches even if filtered/edited."
+        );
+        Console.WriteLine(
+            $"Note: Visual modes only apply to: {string.Join(", ", ImageExtensions)}"
+        );
+        Console.WriteLine();
+        var choice = ConsoleHelper.PromptForEnum("Select mode", (VisualHasherType)0);
+        if ((int)choice == 0)
         {
-            return cache.GetOrAdd(path, p => duplicateDetector.GetFileHash(p));
+            return (null, 0);
         }
-        catch (Exception ex)
+
+        var selectedHasher = visualHashers.FirstOrDefault(h => h.Type == choice);
+        if (selectedHasher == null)
         {
-            errors.Add((path, ex));
-            return $"ERROR-{Guid.NewGuid()}";
+            Console.WriteLine($"(!) Hasher {choice} not registered. Defaulting to Exact.");
+            return (null, 0);
         }
+
+        int recommended = choice == VisualHasherType.Perceptual ? 8 : 2;
+        Console.Write($"Threshold 0-64 (Match:0, Recommended:{recommended} - Default, Loose:15): ");
+        if (!int.TryParse(Console.ReadLine(), out int threshold))
+        {
+            threshold = recommended;
+        }
+
+        return (selectedHasher, Math.Clamp(threshold, 0, 64));
+    }
+
+    private static void DisplayFinalSummary(
+        List<string> allFiles,
+        List<List<string>> duplicates,
+        ConcurrentBag<(string, Exception)> errors,
+        string log
+    )
+    {
+        int numberOfSetsWithDuplicaates = duplicates.Count;
+        int redundant = duplicates.Sum(d => d.Count) - numberOfSetsWithDuplicaates;
+
+        Console.WriteLine();
+        Console.WriteLine("Analysis Result:");
+        Console.WriteLine($"  Total scanned:   {allFiles.Count}");
+        Console.WriteLine($"  Duplicate sets:  {numberOfSetsWithDuplicaates}");
+        Console.WriteLine($"  Redundant files: {redundant}");
+        if (!errors.IsEmpty)
+            Console.WriteLine($"  Errors:          {errors.Count} (see log)");
+        Console.WriteLine();
+        Console.WriteLine($"Processing complete. Audit Log: {log}");
     }
 
     private void LogDuplicates(
-        List<List<string>> duplicates,
-        ConcurrentBag<(string Path, Exception Ex)> errors
+        List<List<string>> exactDuplicates,
+        List<List<string>> visualDuplicates,
+        ConcurrentBag<(string Path, Exception Ex)> errors,
+        IVisualFileHasher? visualHasher,
+        int threshold
     )
     {
-        auditLogService.WriteHeader("DUPLICATE SCAN RESULTS");
-        if (duplicates.Count == 0)
+        auditLogService.WriteHeader("DUPLICATE SCAN CONFIGURATION");
+        auditLogService.WriteLine($"Binary Hasher:  {fileHasher.GetType().Name}");
+
+        if (visualHasher != null)
         {
-            auditLogService.WriteLine("No duplicates found.");
+            auditLogService.WriteLine($"Visual Hasher:  {visualHasher.Type}");
+            auditLogService.WriteLine($"Threshold:      {threshold} (Range 0-64)");
         }
         else
         {
-            foreach (var set in duplicates)
+            auditLogService.WriteLine("Visual Hashing: Disabled (Exact match only)");
+        }
+
+        auditLogService.WriteHeader("EXACT DUPLICATES (BYTE-FOR-BYTE)");
+        if (exactDuplicates.Count == 0)
+        {
+            auditLogService.WriteLine("No exact duplicates found.");
+        }
+
+        foreach (var set in exactDuplicates)
+        {
+            auditLogService.WriteLine($"\nExact Set ({set.Count} files):");
+            auditLogService.WriteBulletPoints(set, 1);
+        }
+
+
+        if (visualHasher != null)
+        {
+            auditLogService.WriteHeader($"VISUAL DUPLICATES ({visualHasher.Type})");
+            if (visualDuplicates.Count == 0)
             {
-                auditLogService.WriteLine($"\nSet ({set.Count} files):");
-                auditLogService.WriteBulletPoints(set, indentation: 1);
+                auditLogService.WriteLine("No visual duplicates found.");
+            }
+
+            foreach (var set in visualDuplicates)
+            {
+                auditLogService.WriteLine($"\nVisual Set ({set.Count} files):");
+                auditLogService.WriteBulletPoints(set, 1);
             }
         }
 
-        if (errors.Count != 0)
+        if (!errors.IsEmpty)
         {
             auditLogService.WriteHeader("TECHNICAL ERRORS DURING SCAN");
             foreach (var error in errors)
             {
-                auditLogService.WriteLine($"ERROR: {error.Path}");
-                auditLogService.WriteLine($"       Reason: {error.Ex.Message}");
+                auditLogService.WriteLine($"FAIL: {error.Path} -> {error.Ex.Message}");
             }
         }
 

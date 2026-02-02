@@ -126,4 +126,16 @@ public class ConsoleHelper
         Console.WriteLine($"Done ({sw.Elapsed.TotalSeconds:N1}s).");
         return result;
     }
+
+    public static T PromptForEnum<T>(string prompt, T defaultValue) where T : struct, Enum
+    {
+        Console.Write($"{prompt}: ");
+        string? input = Console.ReadLine();
+        if (int.TryParse(input, out int intChoice) && Enum.IsDefined(typeof(T), intChoice))
+        {
+            return (T)Enum.ToObject(typeof(T), intChoice);
+        }
+
+        return defaultValue;
+    }
 }

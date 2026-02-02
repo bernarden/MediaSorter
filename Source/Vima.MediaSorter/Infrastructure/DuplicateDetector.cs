@@ -1,13 +1,10 @@
-﻿using System;
-using System.IO;
-using System.Security.Cryptography;
+﻿using System.IO;
 
 namespace Vima.MediaSorter.Infrastructure;
 
 public interface IDuplicateDetector
 {
     bool AreIdentical(string path1, string path2);
-    string GetFileHash(string path);
 }
 
 public class DuplicateDetector : IDuplicateDetector
@@ -41,22 +38,5 @@ public class DuplicateDetector : IDuplicateDetector
                 return false;
         }
         return true;
-    }
-
-    public string GetFileHash(string path)
-    {
-        var file = new FileInfo(path);
-        if (!file.Exists)
-            return string.Empty;
-
-        using var stream = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read,
-            bufferSize: 65536
-        );
-        byte[] hashBytes = MD5.HashData(stream);
-        return $"{file.Length}-{Convert.ToHexString(hashBytes)}";
     }
 }
