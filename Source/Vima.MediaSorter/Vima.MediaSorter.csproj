@@ -6,8 +6,8 @@
     <ApplicationIcon>Resources/icon.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
     <OutputType>Exe</OutputType>
-    <AssemblyVersion>0.6.0</AssemblyVersion>
-    <InformationalVersion>0.6.0</InformationalVersion>
+    <AssemblyVersion>0.6.1</AssemblyVersion>
+    <InformationalVersion>0.6.1</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
