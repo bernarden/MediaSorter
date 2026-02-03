@@ -123,7 +123,7 @@ public class IdentifyAndSortNewMediaProcessor(
             HandleDuplicates(sortingResult.Duplicates);
 
             Console.WriteLine();
-            Console.WriteLine($"Processing complete. Audit Log: {logPath}");
+            Console.WriteLine($"Processing complete. Audit log: {logPath}");
         }
         catch (Exception ex)
         {
@@ -245,24 +245,24 @@ public class IdentifyAndSortNewMediaProcessor(
 
     private void LogIdentification(IdentifiedMedia identified, AssociatedMedia associated)
     {
-        auditLogService.WriteHeader("STEP 1: IDENTIFICATION RESULTS");
+        auditLogService.LogHeader("STEP 1: IDENTIFICATION RESULTS");
 
         if (identified.MediaFilesWithDates.Any())
         {
-            auditLogService.WriteLine("\n[Ready to Move - Grouped by Target Date]");
+            auditLogService.LogLine("\n[Ready to Move - Grouped by Target Date]");
             var groups = identified.MediaFilesWithDates
                 .GroupBy(f => f.CreatedOn.Date.ToString("yyyy-MM-dd"))
                 .OrderBy(g => g.Key);
 
             foreach (var group in groups)
             {
-                auditLogService.WriteLine($"\nFolder: {group.Key}");
+                auditLogService.LogLine($"\nFolder: {group.Key}");
                 foreach (var file in group)
                 {
-                    auditLogService.WriteLine($"  - [Media]   {file.FilePath}");
+                    auditLogService.LogLine($"  - [Media]   {file.FilePath}");
                     foreach (var sidecar in file.RelatedFiles)
                     {
-                        auditLogService.WriteLine($"  - [Sidecar] {sidecar}");
+                        auditLogService.LogLine($"  - [Sidecar] {sidecar}");
                     }
                 }
             }
@@ -270,82 +270,86 @@ public class IdentifyAndSortNewMediaProcessor(
 
         if (identified.MediaFilesWithoutDates.Any())
         {
-            auditLogService.WriteLine("\n[Missing Metadata - Will be Skipped]");
-            auditLogService.WriteBulletPoints(
+            auditLogService.LogLine("\n[Missing Metadata - Will be Skipped]");
+            auditLogService.LogBulletPoints(
                 identified.MediaFilesWithoutDates.Select(f => $"SKIP:  {f.FilePath}"));
         }
 
         if (associated.RemainingIgnoredFiles.Any())
         {
-            auditLogService.WriteLine("\n[Ignored / Unsupported Files]");
-            auditLogService.WriteBulletPoints(
+            auditLogService.LogLine("\n[Ignored / Unsupported Files]");
+            auditLogService.LogBulletPoints(
                 associated.RemainingIgnoredFiles.Select(f => $"IGNORE: {f}"));
         }
 
         if (identified.ErroredFiles.Any())
         {
-            auditLogService.WriteLine("\n[Technical Errors]");
-            auditLogService.WriteBulletPoints(
+            auditLogService.LogLine("\n[Technical Errors]");
+            auditLogService.LogBulletPoints(
                 identified.ErroredFiles.Select(err => $"ERROR: {err.FilePath} (Exception: {err.Exception.Message})"));
         }
 
-        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.Flush();
     }
 
     private void LogSorting(SortedMedia result)
     {
-        auditLogService.WriteHeader("STEP 2: SORTING RESULTS");
+        auditLogService.LogHeader("STEP 2: SORTING RESULTS");
 
         if (result.Moved.Any())
         {
-            auditLogService.WriteLine("\n[Successfully Moved]");
-            auditLogService.WriteBulletPoints(
+            auditLogService.LogLine("\n[Successfully Moved]");
+            auditLogService.LogBulletPoints(
                 result.Moved.Select(m => $"MOVED: {m.SourcePath} -> {m.DestinationPath}"));
         }
 
         if (result.Duplicates.Any())
         {
-            auditLogService.WriteLine("\n[Duplicates Detected - Already exist at destination]");
-            auditLogService.WriteBulletPoints(
+            auditLogService.LogLine("\n[Duplicates Detected - Already exist at destination]");
+            auditLogService.LogBulletPoints(
                 result.Duplicates.Select(d => $"SKIP:  {d.SourcePath} == {d.DestinationPath}"));
         }
 
         if (result.Errors.Any())
         {
-            auditLogService.WriteLine("\n[Errors - Failed to Move]");
-            auditLogService.WriteBulletPoints(
+            auditLogService.LogLine("\n[Errors - Failed to Move]");
+            auditLogService.LogBulletPoints(
                 result.Errors.Select(err => $"FAIL:  {err.SourcePath} -> Reason: {err.Exception.Message}"));
         }
 
-        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.Flush();
     }
 
     private void LogDeletedDuplicates(
         IReadOnlyList<string> deletedFilePaths,
         IReadOnlyList<(string FilePath, Exception Exception)> errors)
     {
-        auditLogService.WriteHeader("CLEANUP RESULTS");
+        auditLogService.LogHeader("CLEANUP RESULTS");
 
         if (deletedFilePaths.Any())
         {
-            auditLogService.WriteLine("\n[Deleted Successfully]");
-            auditLogService.WriteBulletPoints(
+            auditLogService.LogLine("\n[Deleted Successfully]");
+            auditLogService.LogBulletPoints(
                 deletedFilePaths.Select(path => $"DELETED: {path}"));
         }
 
         if (errors.Any())
         {
-            auditLogService.WriteLine("\n[Deletion Failures]");
-            auditLogService.WriteBulletPoints(
+            auditLogService.LogLine("\n[Deletion Failures]");
+            auditLogService.LogBulletPoints(
                 errors.Select(err => $"ERROR:   {err.FilePath} -> Reason: {err.Exception.Message}"));
         }
 
-        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.Flush();
     }
 
     private void LogError(string message, Exception ex)
     {
-        auditLogService.WriteError(message, ex);
-        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.LogError(message, ex);
+        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.Flush();
     }
 }

@@ -244,7 +244,7 @@ public class FindDuplicatesProcessor(
         if (!errors.IsEmpty)
             Console.WriteLine($"  Errors:          {errors.Count} (see log)");
         Console.WriteLine();
-        Console.WriteLine($"Processing complete. Audit Log: {log}");
+        Console.WriteLine($"Processing complete. Audit log: {log}");
     }
 
     private void LogDuplicates(
@@ -255,61 +255,63 @@ public class FindDuplicatesProcessor(
         int threshold
     )
     {
-        auditLogService.WriteHeader("DUPLICATE SCAN CONFIGURATION");
-        auditLogService.WriteLine($"Binary Hasher:  {fileHasher.GetType().Name}");
+        auditLogService.LogHeader("DUPLICATE SCAN CONFIGURATION");
+        auditLogService.LogLine($"Binary Hasher:  {fileHasher.GetType().Name}");
 
         if (visualHasher != null)
         {
-            auditLogService.WriteLine($"Visual Hasher:  {visualHasher.Type}");
-            auditLogService.WriteLine($"Threshold:      {threshold} (Range 0-64)");
+            auditLogService.LogLine($"Visual Hasher:  {visualHasher.Type}");
+            auditLogService.LogLine($"Threshold:      {threshold} (Range 0-64)");
         }
         else
         {
-            auditLogService.WriteLine("Visual Hashing: Disabled (Exact match only)");
+            auditLogService.LogLine("Visual Hashing: Disabled (Exact match only)");
         }
 
-        auditLogService.WriteHeader("EXACT DUPLICATES (BYTE-FOR-BYTE)");
+        auditLogService.LogHeader("EXACT DUPLICATES (BYTE-FOR-BYTE)");
         if (exactDuplicates.Count == 0)
         {
-            auditLogService.WriteLine("No exact duplicates found.");
+            auditLogService.LogLine("No exact duplicates found.");
         }
 
         foreach (var set in exactDuplicates)
         {
-            auditLogService.WriteLine($"\nExact Set ({set.Count} files):");
-            auditLogService.WriteBulletPoints(set, 1);
+            auditLogService.LogLine($"\nExact Set ({set.Count} files):");
+            auditLogService.LogBulletPoints(set, 1);
         }
 
         if (visualHasher != null)
         {
-            auditLogService.WriteHeader($"VISUAL DUPLICATES ({visualHasher.Type})");
+            auditLogService.LogHeader($"VISUAL DUPLICATES ({visualHasher.Type})");
             if (visualDuplicates.Count == 0)
             {
-                auditLogService.WriteLine("No visual duplicates found.");
+                auditLogService.LogLine("No visual duplicates found.");
             }
 
             foreach (var set in visualDuplicates)
             {
-                auditLogService.WriteLine($"\nVisual Set ({set.Count} files):");
-                auditLogService.WriteBulletPoints(set, 1);
+                auditLogService.LogLine($"\nVisual Set ({set.Count} files):");
+                auditLogService.LogBulletPoints(set, 1);
             }
         }
 
         if (!errors.IsEmpty)
         {
-            auditLogService.WriteHeader("TECHNICAL ERRORS DURING SCAN");
+            auditLogService.LogHeader("TECHNICAL ERRORS DURING SCAN");
             foreach (var error in errors)
             {
-                auditLogService.WriteLine($"FAIL: {error.Path} -> {error.Ex.Message}");
+                auditLogService.LogLine($"FAIL: {error.Path} -> {error.Ex.Message}");
             }
         }
 
-        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator);
+        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator);
+        auditLogService.Flush();
     }
 
     private void LogError(string message, Exception ex)
     {
-        auditLogService.WriteError(message, ex);
-        auditLogService.WriteLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.LogError(message, ex);
+        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
+        auditLogService.Flush();
     }
 }

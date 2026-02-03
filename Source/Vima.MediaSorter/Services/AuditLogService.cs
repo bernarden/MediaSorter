@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Services;
@@ -9,57 +10,61 @@ namespace Vima.MediaSorter.Services;
 public interface IAuditLogService
 {
     string Initialise();
-    void WriteHeader(string title);
-    void WriteBulletPoints(IEnumerable<string> items, int indentation = 0);
-    void WriteLine(string text);
-    void WriteError(string context, Exception ex);
+    void LogHeader(string title);
+    void LogBulletPoints(IEnumerable<string> items, int indentation = 0);
+    void LogLine(string text);
+    void LogError(string context, Exception ex);
+    void Flush();
 }
 
 public class AuditLogService(IOptions<MediaSorterOptions> options) : IAuditLogService
 {
     private string? _logPath;
+    private readonly StringBuilder _buffer = new();
 
     public string Initialise()
     {
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        _logPath = Path.Combine(options.Value.Directory, $"MediaSorter_{timestamp}.log");
+        string fileName = $"MediaSorter_{timestamp}.log";
+        _logPath = Path.Combine(options.Value.Directory, fileName);
 
-        File.WriteAllText(_logPath, $"=== Vima.MediaSorter Session: {DateTime.Now} ===\n\n");
-        return _logPath;
+        _buffer.Clear();
+        _buffer.AppendLine($"=== Vima.MediaSorter Session: {DateTime.Now} ===");
+        _buffer.AppendLine();
+        return fileName;
     }
 
-    public void WriteHeader(string title)
+
+    public void LogHeader(string title)
     {
-        WriteLine($"\n--- [{title.ToUpper()}] ---");
+        _buffer.AppendLine($"\n--- [{title.ToUpper()}] ---");
     }
 
-    public void WriteBulletPoints(IEnumerable<string> items, int indentation = 0)
+    public void LogBulletPoints(IEnumerable<string> items, int indentation = 0)
     {
         var prefix = new string(' ', indentation * 2);
-        using var sw = GetWriter();
         foreach (var item in items)
         {
-            sw.WriteLine($"{prefix}- {item}");
+            _buffer.AppendLine($"{prefix}- {item}");
         }
     }
 
-    public void WriteLine(string text)
+    public void LogLine(string text)
     {
-        using var sw = GetWriter();
-        sw.WriteLine(text);
+        _buffer.AppendLine(text);
     }
 
-    public void WriteError(string context, Exception ex)
+    public void LogError(string context, Exception ex)
     {
-        using var sw = GetWriter();
-        sw.WriteLine($"\n[!] ERROR: {context}");
-        sw.WriteLine($"    Message: {ex.Message}");
-        sw.WriteLine($"    Stack: {ex.StackTrace}");
+        _buffer.AppendLine($"\n[!] ERROR: {context}");
+        _buffer.AppendLine($"    Message: {ex.Message}");
+        _buffer.AppendLine($"    Stack: {ex.StackTrace}");
     }
 
-    private StreamWriter GetWriter()
+    public void Flush()
     {
-        var stream = new FileStream(_logPath!, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-        return new StreamWriter(stream) { AutoFlush = true };
+        if (_logPath == null || _buffer.Length == 0) return;
+        File.AppendAllText(_logPath, _buffer.ToString());
+        _buffer.Clear();
     }
 }
