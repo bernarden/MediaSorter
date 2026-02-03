@@ -14,7 +14,8 @@ public interface IDirectoryIdentificationService
 
 public class DirectoryIdentificationService(
     IDirectoryResolver directoryResolver,
-    IOptions<MediaSorterOptions> options) : IDirectoryIdentificationService
+    IOptions<MediaSorterOptions> options
+) : IDirectoryIdentificationService
 {
     public DirectoryStructure Identify(IProgress<double>? progress = null)
     {
@@ -29,8 +30,11 @@ public class DirectoryIdentificationService(
 
         for (int i = 0; i < directoryPaths.Length; i++)
         {
-            string directoryPath = directoryPaths[i];
-            ProcessDirectoryPath(directoryPath, result, dateToExistingDirectoriesMapping);
+            ScanDirectoryRecursively(
+                directoryPaths[i],
+                result,
+                dateToExistingDirectoriesMapping
+            );
             progress?.Report((double)(i + 1) / directoryPaths.Length);
         }
 
@@ -41,23 +45,28 @@ public class DirectoryIdentificationService(
             result.DateToExistingDirectoryMapping[date] = existingDirectories[0];
 
             if (existingDirectories.Count > 1)
-                result.DateToIgnoredDirectoriesMapping[date] = existingDirectories.GetRange(1, existingDirectories.Count - 1);
+                result.DateToIgnoredDirectoriesMapping[date] =
+                    existingDirectories.GetRange(1, existingDirectories.Count - 1);
         }
         return result;
     }
 
-    private void ProcessDirectoryPath(
+    private void ScanDirectoryRecursively(
         string directoryPath,
         DirectoryStructure result,
-        Dictionary<DateTime, List<string>> dateToExistingDirectoriesMapping)
+        Dictionary<DateTime, List<string>> dateToExistingDirectoriesMapping
+    )
     {
         DirectoryInfo directoryInfo = new(directoryPath);
-        string directoryName = directoryInfo.Name;
-
-        DateTime? directoryDate = directoryResolver.GetDateFromDirectoryName(directoryName);
+        DateTime? directoryDate = directoryResolver.GetDateFromDirectoryName(directoryInfo.Name);
         if (directoryDate == null)
         {
             result.UnsortedFolders.Add(directoryPath);
+
+            foreach (var subDir in Directory.GetDirectories(directoryPath))
+            {
+                ScanDirectoryRecursively(subDir, result, dateToExistingDirectoriesMapping);
+            }
         }
         else
         {
@@ -65,11 +74,11 @@ public class DirectoryIdentificationService(
             DateTime date = directoryDate.Value.Date;
             if (dateToExistingDirectoriesMapping.TryGetValue(date, out List<string>? existingDirectories))
             {
-                existingDirectories.Add(directoryName);
+                existingDirectories.Add(directoryPath);
             }
             else
             {
-                dateToExistingDirectoriesMapping.Add(date, new List<string>() { directoryPath });
+                dateToExistingDirectoriesMapping.Add(date, new List<string> { directoryPath });
             }
         }
     }
