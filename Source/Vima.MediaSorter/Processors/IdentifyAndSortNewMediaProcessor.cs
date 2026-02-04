@@ -37,7 +37,17 @@ public class IdentifyAndSortNewMediaProcessor(
             var directoryStructure = ConsoleHelper.ExecuteWithProgress("Identifying directories",
                 directoryIdentifingService.Identify);
 
-            IEnumerable<string> directoriesToScan = [options.Value.Directory, .. directoryStructure.UnsortedFolders];
+            List<string> directoriesToScan = [options.Value.Directory];
+            if (directoryStructure.UnsortedFolders.Count > 0)
+            {
+                Console.WriteLine($"  Found {directoryStructure.UnsortedFolders.Count} unsorted sub-folder(s).");
+                var response = ConsoleHelper.AskYesNoQuestion("  Include sub-folders in media scan?", ConsoleKey.N);
+                if (response == ConsoleKey.Y)
+                {
+                    directoriesToScan.AddRange(directoryStructure.UnsortedFolders);
+                }
+            }
+
             var identified = ConsoleHelper.ExecuteWithProgress("Identifying media files",
                 p => mediaIdentifyingService.Identify(directoriesToScan, p));
 
