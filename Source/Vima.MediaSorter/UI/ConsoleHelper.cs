@@ -6,8 +6,10 @@ namespace Vima.MediaSorter.UI;
 
 public class ConsoleHelper
 {
-    public const string Separator = "================================================================================";
-    public const string TaskSeparator = "--------------------------------------------------------------------------------";
+    public const string Separator =
+        "================================================================================";
+    public const string TaskSeparator =
+        "--------------------------------------------------------------------------------";
 
     public static ConsoleKey AskYesNoQuestion(string question, ConsoleKey? defaultAnswer = null)
     {
@@ -21,31 +23,47 @@ public class ConsoleHelper
 
     private static ConsoleKey AskYesNoQuestionWithoutDefaultAnswer(string question)
     {
-        ConsoleKey response = ConsoleKey.Enter;
-        while (response != ConsoleKey.Y && response != ConsoleKey.N)
+        while (true)
         {
             Console.Write($"{question} [y/n] ");
-            response = Console.ReadKey(false).Key;
-            if (response != ConsoleKey.Enter)
-                Console.WriteLine();
-        }
+            ConsoleKey key = Console.ReadKey(true).Key;
+            if (key is ConsoleKey.Y or ConsoleKey.N)
+            {
+                Console.WriteLine(key == ConsoleKey.Y ? "y" : "n");
+                return key;
+            }
 
-        return response;
+            Console.WriteLine();
+        }
     }
 
     private static ConsoleKey AskYesNoQuestionWithDefaultAnswer(string question, ConsoleKey defaultAnswer)
     {
-        Console.Write(defaultAnswer == ConsoleKey.Y ? $"{question} [Y/n] " : $"{question} [y/N] ");
-        ConsoleKey response = Console.ReadKey(false).Key;
-        Console.WriteLine();
-        return response is ConsoleKey.Y or ConsoleKey.N ? response : defaultAnswer;
+        while (true)
+        {
+            Console.Write($"{question} {(defaultAnswer == ConsoleKey.Y ? "[Y/n]" : "[y/N]")} ");
+            ConsoleKeyInfo keyInfo = Console.ReadKey(true);
+
+            if (keyInfo.Key is ConsoleKey.Y or ConsoleKey.N or ConsoleKey.Enter)
+            {
+                ConsoleKey result = keyInfo.Key == ConsoleKey.Enter ? defaultAnswer : keyInfo.Key;
+                char displayChar = keyInfo.Key == ConsoleKey.Enter
+                    ? (defaultAnswer == ConsoleKey.Y ? 'y' : 'n')
+                    : keyInfo.KeyChar;
+
+                Console.WriteLine(displayChar);
+                return result;
+            }
+            Console.WriteLine(keyInfo.KeyChar);
+        }
     }
 
     public static TimeSpan GetVideoUtcOffsetFromUser()
     {
         TimeSpan offsetTimeSpan = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
         string originalSign = offsetTimeSpan.TotalMinutes >= 0 ? "+" : "";
-        string formattedOffset = $"{originalSign}{offsetTimeSpan.Hours:00}:{offsetTimeSpan.Minutes:00}";
+        string formattedOffset =
+            $"{originalSign}{offsetTimeSpan.Hours:00}:{offsetTimeSpan.Minutes:00}";
         StringBuilder offset = new(formattedOffset);
 
         DisplayOffset();
@@ -73,7 +91,6 @@ public class ConsoleHelper
             DisplayOffset();
         }
 
-
         return ConvertOffsetToTimeSpan(offset.ToString());
 
         TimeSpan ConvertOffsetToTimeSpan(string offsetResult)
@@ -100,7 +117,7 @@ public class ConsoleHelper
             {
                 0 => ch is '+' or '-',
                 3 => ch == ':',
-                _ => char.IsDigit(ch)
+                _ => char.IsDigit(ch),
             };
         }
 
@@ -127,15 +144,25 @@ public class ConsoleHelper
         return result;
     }
 
-    public static T PromptForEnum<T>(string prompt, T defaultValue) where T : struct, Enum
+    public static T PromptForEnum<T>(string prompt, T defaultValue)
+        where T : struct, Enum
     {
-        Console.Write($"{prompt}: ");
-        string? input = Console.ReadLine();
-        if (int.TryParse(input, out int intChoice) && Enum.IsDefined(typeof(T), intChoice))
+        while (true)
         {
-            return (T)Enum.ToObject(typeof(T), intChoice);
+            Console.Write($"{prompt}: ");
+            int cursorLeft = Console.CursorLeft;
+            string? input = Console.ReadLine()?.Trim();
+            bool isDefault = string.IsNullOrEmpty(input);
+            bool isValid = !isDefault &&
+                           int.TryParse(input, out int intChoice) &&
+                           Enum.IsDefined(typeof(T), intChoice);
+            if (isDefault || isValid)
+            {
+                T selected = isDefault ? defaultValue : (T)Enum.ToObject(typeof(T), int.Parse(input!));
+                Console.SetCursorPosition(cursorLeft, Console.CursorTop - 1);
+                Console.WriteLine($"{Convert.ToInt32(selected)}".PadRight(Console.WindowWidth - cursorLeft));
+                return selected;
+            }
         }
-
-        return defaultValue;
     }
 }
