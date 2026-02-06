@@ -29,11 +29,10 @@ public class AuditLogService(IOptions<MediaSorterOptions> options) : IAuditLogSe
         _logPath = Path.Combine(options.Value.Directory, fileName);
 
         _buffer.Clear();
-        _buffer.AppendLine($"=== Vima.MediaSorter Session: {DateTime.Now} ===");
+        _buffer.AppendLine($"=== Vima.MediaSorter Session: {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
         _buffer.AppendLine();
         return fileName;
     }
-
 
     public void LogHeader(string title)
     {
