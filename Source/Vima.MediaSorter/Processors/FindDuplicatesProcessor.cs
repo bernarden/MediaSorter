@@ -68,7 +68,7 @@ public class FindDuplicatesProcessor(
     private void OutputConfiguration()
     {
         Console.WriteLine($"Configuration:");
-        Console.WriteLine($"  Directory:      {options.Value.Directory}");
+        Console.WriteLine($"  Directory: {options.Value.Directory}");
         Console.WriteLine();
     }
 
@@ -185,7 +185,7 @@ public class FindDuplicatesProcessor(
     {
         Console.WriteLine("Duplicate Detection Modes:");
         Console.WriteLine(
-            "  [0] Exact: Byte-for-byte match. Fastest; misses resized/edited images."
+            "  [0] Exact (default): Byte-for-byte match. Fastest; misses resized/edited images."
         );
         Console.WriteLine(
             $"  [{(int)VisualHasherType.Average}] Average: High speed. Best for near-identical copies."
@@ -200,7 +200,7 @@ public class FindDuplicatesProcessor(
             $"Note: Visual modes only apply to: {string.Join(", ", ImageExtensions)}"
         );
         Console.WriteLine();
-        var choice = ConsoleHelper.PromptForEnum("Select mode", (VisualHasherType)0);
+        var choice = ConsoleHelper.PromptForEnum<VisualHasherType>("Select mode", 0);
         if ((int)choice == 0)
         {
             Console.WriteLine();
@@ -216,7 +216,7 @@ public class FindDuplicatesProcessor(
         }
 
         int recommended = choice == VisualHasherType.Perceptual ? 8 : 2;
-        Console.Write($"Threshold 0-64 (Match:0, Recommended:{recommended} - Default, Loose:15): ");
+        Console.Write($"Threshold 0-64 (match:0, default:{recommended}, loose:15): ");
         if (!int.TryParse(Console.ReadLine(), out int threshold))
         {
             threshold = recommended;
