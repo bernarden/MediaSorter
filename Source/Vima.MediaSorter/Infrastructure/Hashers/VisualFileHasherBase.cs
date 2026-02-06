@@ -9,6 +9,7 @@ public interface IVisualFileHasher
 {
     VisualHasherType Type { get; }
     ulong GetHash(string path);
+    ulong GetHash(SKBitmap bitmap);
     bool IsMatch(ulong hash1, ulong hash2, int threshold);
 }
 
@@ -22,24 +23,18 @@ public abstract class VisualFileHasherBase : IVisualFileHasher
 
     public ulong GetHash(string path)
     {
-        try
-        {
-            using var stream = File.OpenRead(path);
-            using var original = SKBitmap.Decode(stream);
-            if (original == null)
-                return 0;
+        using var stream = File.OpenRead(path);
+        using var original = SKBitmap.Decode(stream);
+        return GetHash(original);
+    }
 
-            var (w, h) = RequiredSize;
-            var info = new SKImageInfo(w, h, SKColorType.Gray8, SKAlphaType.Opaque);
-            using var resized = new SKBitmap(info);
-
-            original.ScalePixels(resized, SKSamplingOptions.Default);
-            return GenerateHash(resized);
-        }
-        catch
-        {
-            return 0;
-        }
+    public ulong GetHash(SKBitmap bitmap)
+    {
+        var (w, h) = RequiredSize;
+        var info = new SKImageInfo(w, h, SKColorType.Gray8, SKAlphaType.Opaque);
+        using var resized = new SKBitmap(info);
+        bitmap.ScalePixels(resized, SKSamplingOptions.Default);
+        return GenerateHash(resized);
     }
 
     public virtual bool IsMatch(ulong hash1, ulong hash2, int threshold)

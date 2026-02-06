@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Options;
+using SkiaSharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -37,12 +39,16 @@ public class FindDuplicatesProcessor(
         {
             Console.WriteLine("[Step 1/1] Duplicate Detection");
             Console.WriteLine(ConsoleHelper.TaskSeparator);
+            Stopwatch sw = Stopwatch.StartNew();
 
             List<string> allFiles = Directory
                 .EnumerateFiles(options.Value.Directory, "*", SearchOption.AllDirectories)
                 .ToList();
 
-            var (visualHashes, binaryHashes, errors) = GenerateHashes(visualHasher, allFiles);
+            var (visualHashes, binaryHashes, metadata, errors) = GenerateHashes(
+                visualHasher,
+                allFiles
+            );
 
             var (exactDuplicates, visualDuplicates) = ClusterDuplicates(
                 threshold,
@@ -50,10 +56,20 @@ public class FindDuplicatesProcessor(
                 binaryHashes
             );
 
-            LogDuplicates(exactDuplicates, visualDuplicates, errors, visualHasher, threshold);
+            sw.Stop();
+            LogDuplicates(
+                exactDuplicates,
+                visualDuplicates,
+                metadata,
+                errors,
+                visualHasher,
+                threshold,
+                allFiles.Count,
+                sw.Elapsed
+            );
 
             var allDuplicates = exactDuplicates.Concat(visualDuplicates).ToList();
-            DisplayFinalSummary(allFiles, allDuplicates, errors, logPath);
+            DisplayFinalSummary(allFiles, allDuplicates, errors, logPath, sw.Elapsed);
         }
         catch (Exception ex)
         {
@@ -75,6 +91,7 @@ public class FindDuplicatesProcessor(
     private (
         ConcurrentDictionary<string, ulong> visualHashes,
         ConcurrentDictionary<string, string> binaryHashes,
+        ConcurrentDictionary<string, (long size, string resolution)> metadata,
         ConcurrentBag<(string Path, Exception Ex)> errors
     ) GenerateHashes(IVisualFileHasher? visualHasher, List<string> allFiles)
     {
@@ -85,6 +102,7 @@ public class FindDuplicatesProcessor(
                 int processed = 0;
                 ConcurrentDictionary<string, ulong> visualHashes = new();
                 ConcurrentDictionary<string, string> binaryHashes = new();
+                ConcurrentDictionary<string, (long size, string resolution)> metadata = new();
                 ConcurrentBag<(string Path, Exception Ex)> errors = new();
                 Parallel.ForEach(
                     allFiles,
@@ -93,14 +111,19 @@ public class FindDuplicatesProcessor(
                     {
                         try
                         {
-                            var ext = Path.GetExtension(path).ToLower();
+                            var info = new FileInfo(path);
+                            var ext = info.Extension.ToLower();
                             if (visualHasher != null && ImageExtensions.Contains(ext))
                             {
-                                visualHashes[path] = visualHasher.GetHash(path);
+                                using var stream = File.OpenRead(path);
+                                using var bitmap = SKBitmap.Decode(stream);
+                                metadata[path] = (info.Length, $"{bitmap.Width}x{bitmap.Height}");
+                                visualHashes[path] = visualHasher.GetHash(bitmap);
                             }
                             else
                             {
                                 binaryHashes[path] = fileHasher.GetHash(path);
+                                metadata[path] = (info.Length, "N/A");
                             }
                         }
                         catch (Exception ex)
@@ -114,7 +137,7 @@ public class FindDuplicatesProcessor(
                     }
                 );
 
-                return (visualHashes, binaryHashes, errors);
+                return (visualHashes, binaryHashes, metadata, errors);
             }
         );
     }
@@ -230,7 +253,8 @@ public class FindDuplicatesProcessor(
         List<string> allFiles,
         List<List<string>> duplicates,
         ConcurrentBag<(string, Exception)> errors,
-        string log
+        string log,
+        TimeSpan duration
     )
     {
         int numberOfSetsWithDuplicaates = duplicates.Count;
@@ -239,6 +263,7 @@ public class FindDuplicatesProcessor(
         Console.WriteLine();
         Console.WriteLine("Analysis Result:");
         Console.WriteLine($"  Total scanned:   {allFiles.Count}");
+        Console.WriteLine($"  Detection time:  {duration:hh\\:mm\\:ss\\.ff}");
         Console.WriteLine($"  Duplicate sets:  {numberOfSetsWithDuplicaates}");
         Console.WriteLine($"  Redundant files: {redundant}");
         if (!errors.IsEmpty)
@@ -250,12 +275,27 @@ public class FindDuplicatesProcessor(
     private void LogDuplicates(
         List<List<string>> exactDuplicates,
         List<List<string>> visualDuplicates,
+        ConcurrentDictionary<string, (long size, string resolution)> metadata,
         ConcurrentBag<(string Path, Exception Ex)> errors,
         IVisualFileHasher? visualHasher,
-        int threshold
+        int threshold,
+        int totalScanned,
+        TimeSpan duration
     )
     {
-        auditLogService.LogHeader("DUPLICATE SCAN CONFIGURATION");
+        int duplicateSets = exactDuplicates.Count + visualDuplicates.Count;
+        int redundantFiles =
+            exactDuplicates.Sum(d => d.Count) + visualDuplicates.Sum(d => d.Count) - duplicateSets;
+
+        auditLogService.LogHeader("DUPLICATE DETECTION SUMMARY");
+        auditLogService.LogLine($"Directory:      {options.Value.Directory}");
+        auditLogService.LogLine($"Total Scanned:  {totalScanned}");
+        auditLogService.LogLine($"Execution Time: {duration:hh\\:mm\\:ss\\.ff}");
+        auditLogService.LogLine($"Duplicate Sets: {duplicateSets}");
+        auditLogService.LogLine($"Redundant:      {redundantFiles} files can be removed");
+        auditLogService.LogLine($"Errors:         {errors.Count}");
+
+        auditLogService.LogHeader("SCAN CONFIGURATION");
         auditLogService.LogLine($"Binary Hasher:  {fileHasher.GetType().Name}");
 
         if (visualHasher != null)
@@ -263,36 +303,14 @@ public class FindDuplicatesProcessor(
             auditLogService.LogLine($"Visual Hasher:  {visualHasher.Type}");
             auditLogService.LogLine($"Threshold:      {threshold} (Range 0-64)");
         }
-        else
-        {
-            auditLogService.LogLine("Visual Hashing: Disabled (Exact match only)");
-        }
 
         auditLogService.LogHeader("EXACT DUPLICATES (BYTE-FOR-BYTE)");
-        if (exactDuplicates.Count == 0)
-        {
-            auditLogService.LogLine("No exact duplicates found.");
-        }
-
-        foreach (var set in exactDuplicates)
-        {
-            auditLogService.LogLine($"\nExact Set ({set.Count} files):");
-            auditLogService.LogBulletPoints(set, 1);
-        }
+        LogDuplicateGroups(exactDuplicates, metadata);
 
         if (visualHasher != null)
         {
             auditLogService.LogHeader($"VISUAL DUPLICATES ({visualHasher.Type})");
-            if (visualDuplicates.Count == 0)
-            {
-                auditLogService.LogLine("No visual duplicates found.");
-            }
-
-            foreach (var set in visualDuplicates)
-            {
-                auditLogService.LogLine($"\nVisual Set ({set.Count} files):");
-                auditLogService.LogBulletPoints(set, 1);
-            }
+            LogDuplicateGroups(visualDuplicates, metadata);
         }
 
         if (!errors.IsEmpty)
@@ -306,6 +324,41 @@ public class FindDuplicatesProcessor(
 
         auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator);
         auditLogService.Flush();
+    }
+
+    private void LogDuplicateGroups(
+        List<List<string>> groups,
+        ConcurrentDictionary<string, (long size, string resolution)> metadata
+    )
+    {
+        if (groups.Count == 0)
+        {
+            auditLogService.LogLine("No duplicates identified.");
+            return;
+        }
+
+        foreach (var group in groups)
+        {
+            auditLogService.LogLine($"\nGroup Set ({group.Count} files):");
+            var fileDetails = group.Select(path =>
+            {
+                var (size, resolution) = metadata[path];
+                return $"{path} [{FormatFileSize(size)} | {resolution}]";
+            });
+
+            auditLogService.LogBulletPoints(fileDetails, 1);
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sufix = { "B", "KB", "MB", "GB", "TB" };
+        int i;
+        double dblSByte = bytes;
+        for (i = 0; i < sufix.Length && bytes >= 1024; i++, bytes /= 1024)
+            dblSByte = bytes / 1024.0;
+
+        return $"{dblSByte:0.##} {sufix[i]}";
     }
 
     private void LogError(string message, Exception ex)
