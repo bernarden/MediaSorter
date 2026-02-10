@@ -71,7 +71,7 @@ public class FindDuplicatesProcessor(
             var allDuplicates = exactDuplicates.Concat(visualDuplicates).ToList();
             DisplayFinalSummary(allFiles, allDuplicates, errors, logPath, sw.Elapsed);
 
-            ReviewDuplicates(allDuplicates);
+            ReviewDuplicates(allDuplicates, metadata);
         }
         catch (Exception ex)
         {
@@ -357,7 +357,10 @@ public class FindDuplicatesProcessor(
         }
     }
 
-    private void ReviewDuplicates(List<List<string>> groups)
+    private void ReviewDuplicates(
+        List<List<string>> groups,
+        ConcurrentDictionary<string, (long size, int width, int height)> metadata
+    )
     {
         if (groups.Count == 0)
             return;
@@ -369,24 +372,34 @@ public class FindDuplicatesProcessor(
         if (response == ConsoleKey.N)
             return;
 
+        string menuPrompt = "[V] View Files | [N] Next Group | [Q] Quit Review: ";
+
         for (int i = 0; i < groups.Count; i++)
         {
             Console.WriteLine();
             Console.WriteLine($"Group {i + 1}/{groups.Count} ({groups[i].Count} files)");
-            foreach (var path in groups[i])
+
+            var sortedGroup = groups[i]
+                .OrderByDescending(path => metadata[path].width * metadata[path].height)
+                .ThenByDescending(path => metadata[path].size)
+                .ToList();
+            foreach (var path in sortedGroup)
             {
-                Console.WriteLine($"  - {Path.GetRelativePath(options.Value.Directory, path)}");
+                var (size, w, h) = metadata[path];
+                string resolution = w > 0 ? $"{w}x{h}" : "N/A";
+                string relativePath = Path.GetRelativePath(options.Value.Directory, path);
+                Console.WriteLine($"  - {relativePath} [{resolution} | {FormatFileSize(size)}]");
             }
 
             bool moveToNext = false;
-            Console.Write("[V] View Files | [N] Next Group | [Q] Quit Review: ");
+            Console.Write(menuPrompt);
             while (!moveToNext)
             {
                 var input = Console.ReadKey(true).Key;
                 switch (input)
                 {
                     case ConsoleKey.V:
-                        OpenGroupFiles(groups[i]);
+                        OpenGroupFiles(sortedGroup, menuPrompt);
                         break;
                     case ConsoleKey.N:
                         Console.WriteLine();
@@ -395,15 +408,15 @@ public class FindDuplicatesProcessor(
                     case ConsoleKey.Q:
                         Console.WriteLine();
                         return;
-                    default:
-                        break;
                 }
             }
         }
     }
 
-    private void OpenGroupFiles(List<string> group)
+    private void OpenGroupFiles(List<string> group, string prompt)
     {
+        bool errorOccurred = false;
+
         foreach (var path in group)
         {
             try
@@ -414,10 +427,17 @@ public class FindDuplicatesProcessor(
             }
             catch (Exception ex)
             {
+                if (!errorOccurred)
+                    Console.WriteLine();
+
+                errorOccurred = true;
                 string relative = Path.GetRelativePath(options.Value.Directory, path);
                 Console.WriteLine($"(!) Failed to open {relative}: {ex.Message}");
             }
         }
+
+        if (errorOccurred)
+            Console.Write(prompt);
     }
 
     private static string FormatFileSize(long bytes)
