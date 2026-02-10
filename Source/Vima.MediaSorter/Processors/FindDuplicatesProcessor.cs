@@ -70,6 +70,8 @@ public class FindDuplicatesProcessor(
 
             var allDuplicates = exactDuplicates.Concat(visualDuplicates).ToList();
             DisplayFinalSummary(allFiles, allDuplicates, errors, logPath, sw.Elapsed);
+
+            ReviewDuplicates(allDuplicates);
         }
         catch (Exception ex)
         {
@@ -268,8 +270,9 @@ public class FindDuplicatesProcessor(
         Console.WriteLine($"  Redundant files: {redundant}");
         if (!errors.IsEmpty)
             Console.WriteLine($"  Errors:          {errors.Count} (see log)");
+        Console.WriteLine($"  Audit log:       {log}");
+
         Console.WriteLine();
-        Console.WriteLine($"Processing complete. Audit log: {log}");
     }
 
     private void LogDuplicates(
@@ -351,6 +354,69 @@ public class FindDuplicatesProcessor(
                 });
 
             auditLogService.LogBulletPoints(fileDetails, 1);
+        }
+    }
+
+    private void ReviewDuplicates(List<List<string>> groups)
+    {
+        if (groups.Count == 0)
+            return;
+
+        var response = ConsoleHelper.AskYesNoQuestion(
+            "Would you like to interactively review duplicate groups one by one?",
+            ConsoleKey.N
+        );
+        if (response == ConsoleKey.N)
+            return;
+
+        for (int i = 0; i < groups.Count; i++)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"Group {i + 1}/{groups.Count} ({groups[i].Count} files)");
+            foreach (var path in groups[i])
+            {
+                Console.WriteLine($"  - {Path.GetRelativePath(options.Value.Directory, path)}");
+            }
+
+            bool moveToNext = false;
+            Console.Write("[V] View Files | [N] Next Group | [Q] Quit Review: ");
+            while (!moveToNext)
+            {
+                var input = Console.ReadKey(true).Key;
+                switch (input)
+                {
+                    case ConsoleKey.V:
+                        OpenGroupFiles(groups[i]);
+                        break;
+                    case ConsoleKey.N:
+                        Console.WriteLine();
+                        moveToNext = true;
+                        break;
+                    case ConsoleKey.Q:
+                        Console.WriteLine();
+                        return;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+
+    private void OpenGroupFiles(List<string> group)
+    {
+        foreach (var path in group)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(
+                    new ProcessStartInfo(path) { UseShellExecute = true }
+                );
+            }
+            catch (Exception ex)
+            {
+                string relative = Path.GetRelativePath(options.Value.Directory, path);
+                Console.WriteLine($"(!) Failed to open {relative}: {ex.Message}");
+            }
         }
     }
 
