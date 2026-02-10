@@ -91,7 +91,7 @@ public class FindDuplicatesProcessor(
     private (
         ConcurrentDictionary<string, ulong> visualHashes,
         ConcurrentDictionary<string, string> binaryHashes,
-        ConcurrentDictionary<string, (long size, string resolution)> metadata,
+        ConcurrentDictionary<string, (long size, int width, int height)> metadata,
         ConcurrentBag<(string Path, Exception Ex)> errors
     ) GenerateHashes(IVisualFileHasher? visualHasher, List<string> allFiles)
     {
@@ -102,7 +102,7 @@ public class FindDuplicatesProcessor(
                 int processed = 0;
                 ConcurrentDictionary<string, ulong> visualHashes = new();
                 ConcurrentDictionary<string, string> binaryHashes = new();
-                ConcurrentDictionary<string, (long size, string resolution)> metadata = new();
+                ConcurrentDictionary<string, (long size, int width, int height)> metadata = new();
                 ConcurrentBag<(string Path, Exception Ex)> errors = new();
                 Parallel.ForEach(
                     allFiles,
@@ -117,13 +117,13 @@ public class FindDuplicatesProcessor(
                             {
                                 using var stream = File.OpenRead(path);
                                 using var bitmap = SKBitmap.Decode(stream);
-                                metadata[path] = (info.Length, $"{bitmap.Width}x{bitmap.Height}");
+                                metadata[path] = (info.Length, bitmap.Width, bitmap.Height);
                                 visualHashes[path] = visualHasher.GetHash(bitmap);
                             }
                             else
                             {
                                 binaryHashes[path] = fileHasher.GetHash(path);
-                                metadata[path] = (info.Length, "N/A");
+                                metadata[path] = (info.Length, 0, 0);
                             }
                         }
                         catch (Exception ex)
@@ -275,7 +275,7 @@ public class FindDuplicatesProcessor(
     private void LogDuplicates(
         List<List<string>> exactDuplicates,
         List<List<string>> visualDuplicates,
-        ConcurrentDictionary<string, (long size, string resolution)> metadata,
+        ConcurrentDictionary<string, (long size, int width, int height)> metadata,
         ConcurrentBag<(string Path, Exception Ex)> errors,
         IVisualFileHasher? visualHasher,
         int threshold,
@@ -328,7 +328,7 @@ public class FindDuplicatesProcessor(
 
     private void LogDuplicateGroups(
         List<List<string>> groups,
-        ConcurrentDictionary<string, (long size, string resolution)> metadata
+        ConcurrentDictionary<string, (long size, int width, int height)> metadata
     )
     {
         if (groups.Count == 0)
@@ -340,11 +340,15 @@ public class FindDuplicatesProcessor(
         foreach (var group in groups)
         {
             auditLogService.LogLine($"\nGroup Set ({group.Count} files):");
-            var fileDetails = group.Select(path =>
-            {
-                var (size, resolution) = metadata[path];
-                return $"{path} [{FormatFileSize(size)} | {resolution}]";
-            });
+            var fileDetails = group
+                .OrderByDescending(path => metadata[path].width * metadata[path].height)
+                .ThenByDescending(path => metadata[path].size)
+                .Select(path =>
+                {
+                    var (size, w, h) = metadata[path];
+                    string resolution = w > 0 ? $"{w}x{h}" : "N/A";
+                    return $"{path} [{resolution} | {FormatFileSize(size)}]";
+                });
 
             auditLogService.LogBulletPoints(fileDetails, 1);
         }
