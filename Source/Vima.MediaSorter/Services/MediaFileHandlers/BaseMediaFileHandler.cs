@@ -12,7 +12,9 @@ public interface IMediaFileHandler
 
     bool CanHandle(string extension);
 
-    MediaFile Handle(string filePath);
+    MediaFile CreateMediaFile(string filePath);
+
+    CreatedOn? GetCreatedOnDateFromMetadata(string filePath);
 }
 
 public abstract partial class BaseMediaFileHandler(params string[] extensions) : IMediaFileHandler
@@ -21,7 +23,20 @@ public abstract partial class BaseMediaFileHandler(params string[] extensions) :
 
     public bool CanHandle(string ext) => SupportedExtensions.Contains(ext);
 
-    public abstract MediaFile Handle(string filePath);
+    public MediaFile CreateMediaFile(string filePath)
+    {
+        var createdOn = TryGetDateFromFileName(filePath);
+        createdOn ??= GetCreatedOnDateFromMetadata(filePath);
+        MediaFile mediaFile = createdOn is null
+            ? new MediaFile(filePath)
+            : new MediaFileWithDate(filePath, createdOn);
+        AfterHandleEffect(mediaFile);
+        return mediaFile;
+    }
+
+    protected virtual void AfterHandleEffect(MediaFile filePath) { }
+
+    public abstract CreatedOn? GetCreatedOnDateFromMetadata(string filePath);
 
     protected static CreatedOn? TryGetDateFromFileName(string filePath)
     {

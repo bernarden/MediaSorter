@@ -64,7 +64,7 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
 
         try
         {
-            var mediaFile = handler.Handle(filePath);
+            var mediaFile = handler.CreateMediaFile(filePath);
             if (mediaFile is MediaFileWithDate datedFile)
             {
                 mediaFilesWithDates.Add(datedFile);

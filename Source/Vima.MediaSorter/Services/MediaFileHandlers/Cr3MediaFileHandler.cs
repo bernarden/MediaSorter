@@ -10,18 +10,12 @@ namespace Vima.MediaSorter.Services.MediaFileHandlers;
 
 public class Cr3MediaFileHandler() : BaseMediaFileHandler(".cr3")
 {
-    public override MediaFile Handle(string filePath)
+    protected override void AfterHandleEffect(MediaFile mediaFile)
     {
-        var createdOn = TryGetDateFromFileName(filePath);
-        createdOn ??= GetCr3CreatedOn(filePath);
-        MediaFile mediaFile = createdOn is null
-            ? new MediaFile(filePath)
-            : new MediaFileWithDate(filePath, createdOn);
         mediaFile.SetTargetSubFolder("raw");
-        return mediaFile;
     }
 
-    private static CreatedOn? GetCr3CreatedOn(string filePath)
+    public override CreatedOn? GetCreatedOnDateFromMetadata(string filePath)
     {
         using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
         var directories = QuickTimeMetadataReader.ReadMetadata(fs);
