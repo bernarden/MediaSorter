@@ -20,16 +20,22 @@ public class JpegMediaFileHandler() : BaseMediaFileHandler(".jpg", ".jpeg")
         return mediaFile;
     }
 
-    public static CreatedOn? GetImageCreatedOnFromExif(string filePath)
+    private static CreatedOn? GetImageCreatedOnFromExif(string filePath)
     {
         using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
         var directories = JpegMetadataReader.ReadMetadata(fs, [new ExifReader()]);
         var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
         if (subIfdDirectory == null) return null;
 
-        if (subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime result))
-            return new(result, CreatedOnSource.MetadataLocal);
+        if (!subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime createdOn))
+            return null;
 
-        return null;
+        var subSecStr = subIfdDirectory.GetString(ExifDirectoryBase.TagSubsecondTimeOriginal)?.Trim();
+        if (!string.IsNullOrEmpty(subSecStr) && int.TryParse(subSecStr, out int subSec))
+        {
+            createdOn = createdOn.AddMilliseconds(subSec * Math.Pow(10, 3 - subSecStr.Length));
+        }
+
+        return new CreatedOn(createdOn, CreatedOnSource.MetadataLocal);
     }
 }
