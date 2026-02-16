@@ -25,7 +25,7 @@ public class TimeZoneAdjustmentService : ITimeZoneAdjustmentService
 
         foreach (var file in targetFiles)
         {
-            var adjustedDate = file.CreatedOn!.Date + offset;
+            var adjustedDate = file.CreatedOn.Date + offset;
             file.SetCreatedOn(new CreatedOn(adjustedDate, CreatedOnSource.MetadataLocal));
         }
     }

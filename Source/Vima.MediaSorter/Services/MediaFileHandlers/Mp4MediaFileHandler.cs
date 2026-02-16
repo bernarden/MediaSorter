@@ -9,17 +9,7 @@ namespace Vima.MediaSorter.Services.MediaFileHandlers;
 
 public class Mp4MediaFileHandler() : BaseMediaFileHandler(".mp4")
 {
-    public override MediaFile Handle(string filePath)
-    {
-        var createdOn = TryGetDateFromFileName(filePath);
-        createdOn ??= GetVideoCreatedOn(filePath);
-        MediaFile mediaFile = createdOn is null
-            ? new MediaFile(filePath)
-            : new MediaFileWithDate(filePath, createdOn);
-        return mediaFile;
-    }
-
-    private static CreatedOn? GetVideoCreatedOn(string filePath)
+    public override CreatedOn? GetCreatedOnDateFromMetadata(string filePath)
     {
         using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
         var directories = QuickTimeMetadataReader.ReadMetadata(fs);

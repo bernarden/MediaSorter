@@ -10,17 +10,7 @@ namespace Vima.MediaSorter.Services.MediaFileHandlers;
 
 public class JpegMediaFileHandler() : BaseMediaFileHandler(".jpg", ".jpeg")
 {
-    public override MediaFile Handle(string filePath)
-    {
-        var createdOn = TryGetDateFromFileName(filePath);
-        createdOn ??= GetImageCreatedOnFromExif(filePath);
-        MediaFile mediaFile = createdOn is null
-            ? new MediaFile(filePath)
-            : new MediaFileWithDate(filePath, createdOn);
-        return mediaFile;
-    }
-
-    private static CreatedOn? GetImageCreatedOnFromExif(string filePath)
+    public override CreatedOn? GetCreatedOnDateFromMetadata(string filePath)
     {
         using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
         var directories = JpegMetadataReader.ReadMetadata(fs, [new ExifReader()]);
