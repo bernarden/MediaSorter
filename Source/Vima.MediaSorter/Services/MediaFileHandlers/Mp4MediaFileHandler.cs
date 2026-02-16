@@ -19,7 +19,7 @@ public class Mp4MediaFileHandler() : BaseMediaFileHandler(".mp4")
         return mediaFile;
     }
 
-    public static CreatedOn? GetVideoCreatedOn(string filePath)
+    private static CreatedOn? GetVideoCreatedOn(string filePath)
     {
         using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
         var directories = QuickTimeMetadataReader.ReadMetadata(fs);
