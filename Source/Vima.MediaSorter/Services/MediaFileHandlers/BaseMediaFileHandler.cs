@@ -19,7 +19,8 @@ public interface IMediaFileHandler
 
 public abstract partial class BaseMediaFileHandler(params string[] extensions) : IMediaFileHandler
 {
-    public IReadOnlySet<string> SupportedExtensions { get; } = new HashSet<string>(extensions, StringComparer.OrdinalIgnoreCase);
+    public IReadOnlySet<string> SupportedExtensions { get; } =
+        new HashSet<string>(extensions, StringComparer.OrdinalIgnoreCase);
 
     public bool CanHandle(string ext) => SupportedExtensions.Contains(ext);
 
@@ -45,15 +46,21 @@ public abstract partial class BaseMediaFileHandler(params string[] extensions) :
 
         if (match.Success)
         {
-            int year = int.Parse(match.Groups["year"].Value);
-            int month = int.Parse(match.Groups["month"].Value);
-            int day = int.Parse(match.Groups["day"].Value);
-            DateTime date = new(year, month, day);
+            DateTime date = new(
+                int.Parse(match.Groups["year"].Value),
+                int.Parse(match.Groups["month"].Value),
+                int.Parse(match.Groups["day"].Value),
+                int.Parse(match.Groups["hour"].Value),
+                int.Parse(match.Groups["minute"].Value),
+                int.Parse(match.Groups["second"].Value)
+            );
             return new CreatedOn(date, CreatedOnSource.FileName);
         }
         return null;
     }
 
-    [GeneratedRegex(@"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])")]
+    [GeneratedRegex(
+        @"(?<year>[12]\d{3})(?<month>0[1-9]|1[0-2])(?<day>[012]\d|3[01])[^\d](?<hour>[012]\d)(?<minute>[0-5]\d)(?<second>[0-5]\d)"
+    )]
     private static partial Regex FileNameRegex();
 }
