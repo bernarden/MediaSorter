@@ -20,6 +20,9 @@ public class RenameSortedMediaProcessor(
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
+    private const string StandardDateFormat = "yyyyMMdd_HHmmss";
+    private const string PrecisionDateFormat = "yyyyMMdd_HHmmss_fff";
+
     public ProcessorOptions Option => ProcessorOptions.RenameSortedMedia;
 
     public void Process()
@@ -43,8 +46,8 @@ public class RenameSortedMediaProcessor(
                 return;
             }
 
-            var foldersToScan = directoryStructure.SortedFolders
-                .Concat(directoryStructure.SortedSubFolders)
+            var foldersToScan = directoryStructure
+                .SortedFolders.Concat(directoryStructure.SortedSubFolders)
                 .ToList();
             var identified = ConsoleHelper.ExecuteWithProgress(
                 "Identifying media files",
@@ -117,7 +120,7 @@ public class RenameSortedMediaProcessor(
         foreach (var folderGroup in folderGroups)
         {
             var secondGroups = folderGroup
-                .GroupBy(f => f.CreatedOn.Date.ToString("yyyyMMdd_HHmmss"))
+                .GroupBy(f => f.CreatedOn.Date.ToString(StandardDateFormat))
                 .OrderBy(g => g.Key);
 
             foreach (var secondGroup in secondGroups)
@@ -138,7 +141,7 @@ public class RenameSortedMediaProcessor(
                 foreach (var media in sorted)
                 {
                     DateTime targetTime = media.CreatedOn.Date;
-                    string format = needsPrecision ? "yyyyMMdd_HHmmss_fff" : "yyyyMMdd_HHmmss";
+                    string format = needsPrecision ? PrecisionDateFormat : StandardDateFormat;
 
                     if (
                         needsPrecision
@@ -220,7 +223,8 @@ public class RenameSortedMediaProcessor(
 
     private void LogExecutionResults(
         List<(string Source, string Destination)> moved,
-        List<(string Source, string Destination, Exception Exception)> errors)
+        List<(string Source, string Destination, Exception Exception)> errors
+    )
     {
         auditLogService.LogHeader("Execution results");
 
@@ -228,24 +232,29 @@ public class RenameSortedMediaProcessor(
         {
             auditLogService.LogLine("\n[Successfully renamed]");
             auditLogService.LogBulletPoints(
-                moved.Select(m => $"RENAME: {m.Source} -> {Path.GetFileName(m.Destination)}"));
+                moved.Select(m => $"RENAME: {m.Source} -> {Path.GetFileName(m.Destination)}")
+            );
         }
 
         if (errors.Count > 0)
         {
             auditLogService.LogLine("\n[Errors - Failed to rename]");
             auditLogService.LogBulletPoints(
-                errors.Select(e => $"FAIL:   {e.Source} -> Reason: {e.Exception.Message}"));
+                errors.Select(e => $"FAIL:   {e.Source} -> Reason: {e.Exception.Message}")
+            );
         }
 
-        auditLogService.LogLine($"\nExecution Summary: {moved.Count} success, {errors.Count} errors.");
+        auditLogService.LogLine(
+            $"\nExecution Summary: {moved.Count} success, {errors.Count} errors."
+        );
         auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
         auditLogService.Flush();
     }
 
     private void TryEnhanceMetadata(MediaFileWithDate file)
     {
-        if (file.CreatedOn.Source != CreatedOnSource.FileName) return;
+        if (file.CreatedOn.Source != CreatedOnSource.FileName)
+            return;
 
         var ext = Path.GetExtension(file.FilePath).ToLowerInvariant();
         var handler = mediaFileHandlers.FirstOrDefault(h => h.CanHandle(ext));
@@ -266,8 +275,8 @@ public class RenameSortedMediaProcessor(
             "Configuration:",
             $"  Directory:      {options.Value.Directory}",
             $"  Extensions:     {string.Join(", ", allExtensions)}",
-            $"  Default format: yyyyMMdd_HHmmss",
-            $"  Burst format:   yyyyMMdd_HHmmss_fff",
+            $"  Default format: {StandardDateFormat}",
+            $"  Burst format:   {PrecisionDateFormat}",
             "",
         };
 
@@ -318,7 +327,10 @@ public class RenameSortedMediaProcessor(
         {
             auditLogService.LogLine("\n[Technical Errors - Identification Failed]");
             auditLogService.LogBulletPoints(
-                identified.ErroredFiles.Select(err => $"ERROR: {err.FilePath} (Exception: {err.Exception.Message})"));
+                identified.ErroredFiles.Select(err =>
+                    $"ERROR: {err.FilePath} (Exception: {err.Exception.Message})"
+                )
+            );
             auditLogService.LogLine($"\n{ConsoleHelper.TaskSeparator}");
         }
 
