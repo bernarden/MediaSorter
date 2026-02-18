@@ -31,55 +31,63 @@ public class DirectoryIdentificationService(
         for (int i = 0; i < directoryPaths.Length; i++)
         {
             ScanDirectoryRecursively(
-                directoryPaths[i],
+                new DirectoryInfo(directoryPaths[i]),
                 result,
                 dateToExistingDirectoriesMapping
             );
             progress?.Report((double)(i + 1) / directoryPaths.Length);
         }
 
-        foreach ((var date, var existingDirectories) in dateToExistingDirectoriesMapping)
+        foreach ((var date, var directories) in dateToExistingDirectoriesMapping)
         {
-            if (existingDirectories.Count <= 0) continue;
+            if (directories.Count <= 0)
+                continue;
 
-            result.DateToExistingDirectoryMapping[date] = existingDirectories[0];
+            result.DateToExistingDirectoryMapping[date] = directories[0];
 
-            if (existingDirectories.Count > 1)
-                result.DateToIgnoredDirectoriesMapping[date] =
-                    existingDirectories.GetRange(1, existingDirectories.Count - 1);
+            if (directories.Count > 1)
+            {
+                var directoriesToIgnore = directories.GetRange(1, directories.Count - 1);
+                result.DateToIgnoredDirectoriesMapping[date] = directoriesToIgnore;
+            }
         }
+
         return result;
     }
 
     private void ScanDirectoryRecursively(
-        string directoryPath,
+        DirectoryInfo directoryInfo,
         DirectoryStructure result,
-        Dictionary<DateTime, List<string>> dateToExistingDirectoriesMapping
+        Dictionary<DateTime, List<string>> dateToDirMapping,
+        bool isInsideSortedBranch = false
     )
     {
-        DirectoryInfo directoryInfo = new(directoryPath);
         DateTime? directoryDate = directoryResolver.GetDateFromDirectoryName(directoryInfo.Name);
-        if (directoryDate == null)
+        if (directoryDate.HasValue)
         {
-            result.UnsortedFolders.Add(directoryPath);
-
-            foreach (var subDir in Directory.GetDirectories(directoryPath))
-            {
-                ScanDirectoryRecursively(subDir, result, dateToExistingDirectoriesMapping);
-            }
+            result.SortedFolders.Add(directoryInfo.FullName);
+            DateTime date = directoryDate.Value.Date;
+            if (dateToDirMapping.TryGetValue(date, out List<string>? existingDirectories))
+                existingDirectories.Add(directoryInfo.FullName);
+            else
+                dateToDirMapping.Add(date, new List<string> { directoryInfo.FullName });
         }
         else
         {
-            result.SortedFolders.Add(directoryPath);
-            DateTime date = directoryDate.Value.Date;
-            if (dateToExistingDirectoriesMapping.TryGetValue(date, out List<string>? existingDirectories))
-            {
-                existingDirectories.Add(directoryPath);
-            }
+            if (isInsideSortedBranch)
+                result.SortedSubFolders.Add(directoryInfo.FullName);
             else
-            {
-                dateToExistingDirectoriesMapping.Add(date, new List<string> { directoryPath });
-            }
+                result.UnsortedFolders.Add(directoryInfo.FullName);
+        }
+
+        foreach (var subDir in directoryInfo.GetDirectories())
+        {
+            ScanDirectoryRecursively(
+                subDir,
+                result,
+                dateToDirMapping,
+                isInsideSortedBranch || directoryDate.HasValue
+            );
         }
     }
 }

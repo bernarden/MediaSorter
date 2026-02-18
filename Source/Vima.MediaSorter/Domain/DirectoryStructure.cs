@@ -11,5 +11,7 @@ public class DirectoryStructure
 
     public IList<string> SortedFolders { get; } = new List<string>();
 
+    public IList<string> SortedSubFolders { get; } = new List<string>();
+
     public IList<string> UnsortedFolders { get; } = new List<string>();
 }
