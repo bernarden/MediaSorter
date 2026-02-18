@@ -43,9 +43,12 @@ public class RenameSortedMediaProcessor(
                 return;
             }
 
+            var foldersToScan = directoryStructure.SortedFolders
+                .Concat(directoryStructure.SortedSubFolders)
+                .ToList();
             var identified = ConsoleHelper.ExecuteWithProgress(
                 "Identifying media files",
-                p => mediaIdentifyingService.Identify(directoryStructure.SortedFolders, p)
+                p => mediaIdentifyingService.Identify(foldersToScan, p)
             );
 
             var associated = relatedFileDiscoveryService.AssociateRelatedFiles(
