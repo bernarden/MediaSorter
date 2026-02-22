@@ -20,9 +20,6 @@ public class RenameSortedMediaProcessor(
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
-    private const string StandardDateFormat = "yyyyMMdd_HHmmss";
-    private const string PrecisionDateFormat = "yyyyMMdd_HHmmss_fff";
-
     public ProcessorOptions Option => ProcessorOptions.RenameSortedMedia;
 
     public void Process()
@@ -120,7 +117,7 @@ public class RenameSortedMediaProcessor(
         foreach (var folderGroup in folderGroups)
         {
             var secondGroups = folderGroup
-                .GroupBy(f => f.CreatedOn.Date.ToString(StandardDateFormat))
+                .GroupBy(f => f.CreatedOn.Date.ToString(MediaSorterConstants.StandardDateFormat))
                 .OrderBy(g => g.Key);
 
             foreach (var secondGroup in secondGroups)
@@ -141,7 +138,9 @@ public class RenameSortedMediaProcessor(
                 foreach (var media in sorted)
                 {
                     DateTime targetTime = media.CreatedOn.Date;
-                    string format = needsPrecision ? PrecisionDateFormat : StandardDateFormat;
+                    string format = needsPrecision
+                        ? MediaSorterConstants.PrecisionDateFormat
+                        : MediaSorterConstants.StandardDateFormat;
 
                     if (
                         needsPrecision
@@ -212,7 +211,9 @@ public class RenameSortedMediaProcessor(
             Console.WriteLine($"(!) {errors.Count} error(s) encountered (see log for details).");
 
             foreach (var error in errors.Take(5))
-                Console.WriteLine($"    - {Path.GetFileName(error.Source)}: {error.Exception.Message}");
+                Console.WriteLine(
+                    $"    - {Path.GetFileName(error.Source)}: {error.Exception.Message}"
+                );
 
             if (errors.Count > 5)
                 Console.WriteLine("    - ... (see logs for more)");
@@ -275,8 +276,8 @@ public class RenameSortedMediaProcessor(
             "Configuration:",
             $"  Directory:      {options.Value.Directory}",
             $"  Extensions:     {string.Join(", ", allExtensions)}",
-            $"  Default format: {StandardDateFormat}",
-            $"  Burst format:   {PrecisionDateFormat}",
+            $"  Default format: {MediaSorterConstants.StandardDateFormat}",
+            $"  Burst format:   {MediaSorterConstants.PrecisionDateFormat}",
             "",
         };
 
