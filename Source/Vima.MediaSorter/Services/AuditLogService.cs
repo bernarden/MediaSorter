@@ -24,7 +24,7 @@ public class AuditLogService(IOptions<MediaSorterOptions> options) : IAuditLogSe
 
     public string Initialise()
     {
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var timestamp = DateTime.Now.ToString(MediaSorterConstants.StandardDateFormat);
         string fileName = $"Vima.MediaSorter_{timestamp}.log";
         _logPath = Path.Combine(options.Value.Directory, fileName);
 

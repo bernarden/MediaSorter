@@ -12,7 +12,7 @@ public class Cr3MediaFileHandler() : BaseMediaFileHandler(".cr3")
 {
     protected override void AfterHandleEffect(MediaFile mediaFile)
     {
-        mediaFile.SetTargetSubFolder("raw");
+        mediaFile.SetTargetSubFolder(MediaSorterConstants.RawFolderName);
     }
 
     public override CreatedOn? GetCreatedOnDateFromMetadata(string filePath)
