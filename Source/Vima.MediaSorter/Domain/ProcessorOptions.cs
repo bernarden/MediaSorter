@@ -6,5 +6,6 @@ public enum ProcessorOptions
     Exit = 0,
     IdentifyAndSortNewMedia = 1,
     FindDuplicates = 2,
-    RenameSortedMedia = 3
+    RenameSortedMedia = 3,
+    CleanupRawMedia = 4
 }

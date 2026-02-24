@@ -52,6 +52,7 @@ public static class Program
         services.AddTransient<IProcessor, IdentifyAndSortNewMediaProcessor>();
         services.AddTransient<IProcessor, FindDuplicatesProcessor>();
         services.AddTransient<IProcessor, RenameSortedMediaProcessor>();
+        services.AddTransient<IProcessor, CleanupRawMediaProcessor>();
 
         services.AddTransient<IDirectoryIdentificationService, DirectoryIdentificationService>();
         services.AddTransient<IMediaIdentificationService, MediaIdentificationService>();
