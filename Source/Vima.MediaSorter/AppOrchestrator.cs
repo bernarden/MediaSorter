@@ -103,8 +103,10 @@ public class AppOrchestrator(
         Console.WriteLine($"  [{(int)ProcessorOptions.IdentifyAndSortNewMedia}] Identify and sort new media");
         Console.WriteLine($"  [{(int)ProcessorOptions.FindDuplicates}] Find duplicates");
         Console.WriteLine($"  [{(int)ProcessorOptions.RenameSortedMedia}] Rename media in sorted folders");
+        Console.WriteLine($"  [{(int)ProcessorOptions.CleanupRawMedia}] Cleanup orphaned RAW files");
         Console.WriteLine($"  [{(int)ProcessorOptions.Exit}] Exit (default)");
         Console.WriteLine();
+
         return ConsoleHelper.PromptForEnum("Enter choice", ProcessorOptions.Exit);
     }
 }
