@@ -169,7 +169,6 @@ public class FindDuplicatesProcessor(
         outputService.Header(title, OutputLevel.Debug);
         foreach (var group in groups)
         {
-            outputService.WriteLine($"Group set ({group.Count} files):", OutputLevel.Debug);
             var fileDetails = group
                 .OrderByDescending(path => metadata[path].width * metadata[path].height)
                 .ThenByDescending(path => metadata[path].size)
@@ -180,10 +179,7 @@ public class FindDuplicatesProcessor(
                     return $"{fileSystem.GetRelativePath(path)} [{resolution} | {FormatFileSize(size)}]";
                 });
 
-            foreach (var detail in fileDetails)
-            {
-                outputService.WriteLine($"  {detail}", OutputLevel.Debug);
-            }
+            outputService.List($"Group set ({group.Count} files):", fileDetails, OutputLevel.Debug);
             outputService.WriteLine("", OutputLevel.Debug);
         }
     }
