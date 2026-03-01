@@ -1,75 +1,126 @@
-﻿using System;
+using Microsoft.Extensions.Options;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Services;
-using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Processors;
 
 public class CleanupRawMediaProcessor(
     IDirectoryIdentificationService directoryIdentificationService,
-    IAuditLogService auditLogService
+    IOutputService outputService,
+    IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
     public ProcessorOptions Option => ProcessorOptions.CleanupRawMedia;
 
+    public HashSet<string> rawExtensions = new(StringComparer.OrdinalIgnoreCase) { ".cr3" };
+
     public void Process()
     {
-        string logPath = auditLogService.Initialise();
+        outputService.Start("Cleanup orphaned RAW files");
 
         try
         {
-            Console.WriteLine("[Step 1/2] Analyzing RAW vs. JPEG synchronisation");
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
+            OutputConfiguration();
 
-            var structure = ConsoleHelper.ExecuteWithProgress(
+            outputService.Header("[Step 1/2] Identification");
+
+            var structure = outputService.ExecuteWithProgress(
                 "Scanning directories",
                 directoryIdentificationService.Identify
             );
 
             var deletionPlan = GenerateDeletionPlan(structure.SortedFolders);
+
+            ReportAnalysisResults(structure, deletionPlan);
+
+            outputService.Header("[Step 2/2] Deletion");
+
             int totalOrphanedCount = deletionPlan.Sum(p => p.Value.Count);
-
-            OutputAnalysis(structure.SortedFolders.Count, totalOrphanedCount, deletionPlan, logPath);
-
-            Console.WriteLine();
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
-            Console.WriteLine("[Step 2/2] Deleting orphaned files");
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
-
             if (totalOrphanedCount == 0)
             {
-                Console.WriteLine("Everything is in sync. No RAW files need to be deleted.");
+                outputService.WriteLine(
+                    "  Everything is in sync. No RAW files need to be deleted."
+                );
+                outputService.WriteLine();
+                outputService.WriteLine(MediaSorterConstants.Separator);
+                outputService.WriteLine();
                 return;
             }
 
-            if (ConsoleHelper.AskYesNoQuestion(
-                $"Action: Delete {totalOrphanedCount} orphaned RAW file(s)?",
-                ConsoleKey.N) != ConsoleKey.Y)
+            if (
+                !outputService.Confirm($"Action: Delete {totalOrphanedCount} orphaned RAW file(s)?")
+            )
             {
-                Console.WriteLine("Result: Operation aborted.");
+                outputService.WriteLine("  Operation aborted.");
+                outputService.WriteLine();
+                outputService.WriteLine(MediaSorterConstants.Separator);
+                outputService.WriteLine();
                 return;
             }
 
             ExecuteDeletion(deletionPlan, totalOrphanedCount);
 
-            Console.WriteLine($"\nProcessing complete. Audit log: {logPath}");
+            outputService.Complete();
         }
         catch (Exception ex)
         {
-            auditLogService.LogError("Critical failure in RAW cleanup", ex);
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n[FATAL ERROR] {ex.Message}");
-            Console.ResetColor();
+            outputService.Fatal("Critical failure in RAW cleanup", ex);
         }
     }
 
-    private static Dictionary<string, List<string>> GenerateDeletionPlan(IList<string> sortedFolders)
+    private void OutputConfiguration()
+    {
+        outputService.Table(
+            "Configuration:",
+            [
+                new("Directory:", options.Value.Directory),
+                new("Log file:", outputService.LogFileName),
+                new("Raw folder:", MediaSorterConstants.RawFolderName),
+                new("Raw extensions:", string.Join(", ", rawExtensions)),
+            ]
+        );
+    }
+
+    private void ReportAnalysisResults(
+        DirectoryStructure structure,
+        Dictionary<string, List<string>> plan
+    )
+    {
+        int orphanedCount = plan.Sum(p => p.Value.Count);
+        outputService.Table(
+            "Analysis result:",
+            [
+                new("Folders checked:", structure.SortedFolders.Count.ToString()),
+                new("Orphaned RAWs:", orphanedCount.ToString()),
+            ]
+        );
+
+        if (plan.Count != 0)
+        {
+            outputService.Header("Proposed deletion plan", OutputLevel.Debug);
+            foreach (var entry in plan.OrderBy(e => e.Key))
+            {
+                outputService.WriteLine($"Folder: {GetRelativePath(entry.Key)}", OutputLevel.Debug);
+                foreach (var file in entry.Value.OrderByPath(x => x))
+                {
+                    outputService.WriteLine(
+                        $"  {Path.GetRelativePath(entry.Key, file)}",
+                        OutputLevel.Debug
+                    );
+                }
+                outputService.WriteLine("", OutputLevel.Debug);
+            }
+        }
+    }
+
+    private Dictionary<string, List<string>> GenerateDeletionPlan(IList<string> sortedFolders)
     {
         var plan = new Dictionary<string, List<string>>();
-        var rawExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".cr3" };
 
         foreach (var mainFolder in sortedFolders)
         {
@@ -78,11 +129,13 @@ public class CleanupRawMediaProcessor(
             if (!Directory.Exists(rawFolderPath))
                 continue;
 
-            var curatedBaseNames = Directory.GetFiles(mainFolder)
+            var curatedBaseNames = Directory
+                .GetFiles(mainFolder)
                 .Select(Path.GetFileNameWithoutExtension)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var orphanedRaws = Directory.GetFiles(rawFolderPath)
+            var orphanedRaws = Directory
+                .GetFiles(rawFolderPath)
                 .Where(f => rawExtensions.Contains(Path.GetExtension(f)))
                 .Where(f => !curatedBaseNames.Contains(Path.GetFileNameWithoutExtension(f)))
                 .ToList();
@@ -100,57 +153,68 @@ public class CleanupRawMediaProcessor(
     {
         int deleted = 0;
         int errors = 0;
+        List<(string FilePath, string ExceptionMessage)> deletionErrors = new();
+        List<string> deleteDetails = new();
 
-        ConsoleHelper.ExecuteWithProgress("Status: Deleting", p =>
-        {
-            foreach (var folderEntry in plan)
+        outputService.ExecuteWithProgress(
+            "  Deleting orphaned files",
+            p =>
             {
-                foreach (var filePath in folderEntry.Value)
+                foreach (var folderEntry in plan)
                 {
-                    try
+                    foreach (var filePath in folderEntry.Value)
                     {
-                        File.Delete(filePath);
-                        auditLogService.LogLine($"DELETE: {filePath}");
-                        deleted++;
+                        try
+                        {
+                            File.Delete(filePath);
+                            deleteDetails.Add(filePath);
+                            deleted++;
+                        }
+                        catch (Exception ex)
+                        {
+                            deletionErrors.Add((filePath, ex.Message));
+                            errors++;
+                        }
+                        p.Report((double)deleted / totalFiles);
                     }
-                    catch (Exception ex)
-                    {
-                        auditLogService.LogLine($"ERROR: Could not delete {filePath} - {ex.Message}");
-                        errors++;
-                    }
-                    p.Report((double)deleted / totalFiles);
                 }
+                return true;
             }
-            return true;
-        });
+        );
 
-        auditLogService.LogLine($"\nSummary: {deleted} deleted successfully, {errors} errors.");
-        auditLogService.Flush();
-        Console.WriteLine($"Result: {deleted} files removed.");
+        outputService.WriteLine($"  Result: Deleted {deleted} file(s).");
+        outputService.WriteLine();
+
+        if (errors > 0)
+        {
+            outputService.List(
+                "Deleted",
+                deleteDetails.OrderByPath(x => x).Select(x => GetRelativePath(x)),
+                OutputLevel.Debug
+            );
+            outputService.WriteLine("", OutputLevel.Debug);
+        }
+
+        if (errors > 0)
+        {
+            outputService.List(
+                "Deletion failures:",
+                deletionErrors
+                    .OrderByPath(x => x.FilePath)
+                    .Select(error =>
+                        $"{GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
+                    ),
+                OutputLevel.Error
+            );
+            outputService.WriteLine("", OutputLevel.Error);
+        }
     }
 
-    private void OutputAnalysis(int sortedCount, int orphanedCount, Dictionary<string, List<string>> plan, string logPath)
+    private string GetRelativePath(string? path)
     {
-        Console.WriteLine("\nAnalysis Result:");
-        Console.WriteLine($"  Sorted folders checked:  {sortedCount}");
-        Console.WriteLine($"  Orphaned RAWs found:     {orphanedCount}");
-        Console.WriteLine($"  Audit log:               {Path.GetFileName(logPath)}");
-        Console.WriteLine();
+        if (path == null)
+            return string.Empty;
 
-        if (plan.Count != 0)
-        {
-            auditLogService.LogHeader("Proposed Deletion Plan (Grouped by Folder)");
-
-            foreach (var entry in plan.OrderBy(e => e.Key))
-            {
-                auditLogService.LogLine($"\nFolder: {entry.Key}");
-                auditLogService.LogLine(new string('-', 50));
-                auditLogService.LogBulletPoints(entry.Value.Select(Path.GetFileName)!);
-            }
-
-            auditLogService.LogLine($"\nTotal files to be removed: {orphanedCount}");
-            auditLogService.LogLine($"\n{new string('=', 50)}\n");
-            auditLogService.Flush();
-        }
+        return Path.GetRelativePath(options.Value.Directory, path);
     }
 }

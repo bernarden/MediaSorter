@@ -1,8 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vima.MediaSorter.Domain;
-using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Services;
 
@@ -11,7 +10,7 @@ public interface ITimeZoneAdjustmentService
     IReadOnlyList<string> ApplyOffsetsIfNeeded(IEnumerable<MediaFileWithDate> files);
 }
 
-public class TimeZoneAdjustmentService : ITimeZoneAdjustmentService
+public class TimeZoneAdjustmentService(IOutputService outputService) : ITimeZoneAdjustmentService
 {
     public IReadOnlyList<string> ApplyOffsetsIfNeeded(IEnumerable<MediaFileWithDate> files)
     {
@@ -20,9 +19,10 @@ public class TimeZoneAdjustmentService : ITimeZoneAdjustmentService
             .Where(f => f.CreatedOn.Source == CreatedOnSource.MetadataUtc)
             .ToList();
 
-        if (targetFiles.Count == 0) return result;
+        if (targetFiles.Count == 0)
+            return result;
 
-        TimeSpan offset = ConsoleHelper.GetVideoUtcOffsetFromUser();
+        TimeSpan offset = outputService.GetVideoUtcOffsetFromUser();
 
         foreach (var file in targetFiles)
         {

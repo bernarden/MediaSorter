@@ -1,12 +1,12 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.Services.MediaFileHandlers;
-using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Processors;
 
@@ -17,7 +17,7 @@ public class IdentifyAndSortNewMediaProcessor(
     IMediaSortingService mediaSortingService,
     IRelatedFilesDiscoveryService relatedFileDiscoveryService,
     IEnumerable<IMediaFileHandler> mediaFileHandlers,
-    IAuditLogService auditLogService,
+    IOutputService outputService,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
@@ -25,123 +25,114 @@ public class IdentifyAndSortNewMediaProcessor(
 
     public void Process()
     {
-        string logPath = auditLogService.Initialise();
+        outputService.Start("Identify and sort new media");
 
         try
         {
             OutputConfiguration();
 
-            Console.WriteLine("[Step 1/2] Identification");
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
+            outputService.Header("[Step 1/2] Identification");
 
-            var directoryStructure = ConsoleHelper.ExecuteWithProgress("Identifying directories",
-                directoryIdentifingService.Identify);
+            var directoryStructure = outputService.ExecuteWithProgress(
+                "Identifying directories",
+                directoryIdentifingService.Identify
+            );
 
             List<string> directoriesToScan = [options.Value.Directory];
             if (directoryStructure.UnsortedFolders.Count > 0)
             {
-                Console.WriteLine($"  Found {directoryStructure.UnsortedFolders.Count} unsorted sub-folder(s).");
-                var response = ConsoleHelper.AskYesNoQuestion("  Include sub-folders in media scan?", ConsoleKey.N);
-                if (response == ConsoleKey.Y)
+                string question =
+                    $"Action: Include {directoryStructure.UnsortedFolders.Count} unsorted sub-folder(s) in scan?";
+                if (outputService.Confirm(question))
                 {
                     directoriesToScan.AddRange(directoryStructure.UnsortedFolders);
                 }
             }
 
-            var identified = ConsoleHelper.ExecuteWithProgress("Identifying media files",
-                p => mediaIdentifyingService.Identify(directoriesToScan, p));
+            var identified = outputService.ExecuteWithProgress(
+                "Identifying media files",
+                p => mediaIdentifyingService.Identify(directoriesToScan, p)
+            );
 
             var associated = relatedFileDiscoveryService.AssociateRelatedFiles(
-                identified.MediaFilesWithDates, identified.UnsupportedFiles);
+                identified.MediaFilesWithDates,
+                identified.UnsupportedFiles
+            );
 
-            LogIdentification(identified, associated);
+            timeZoneAdjusterService.ApplyOffsetsIfNeeded(identified.MediaFilesWithDates);
 
-            Console.WriteLine();
-            Console.WriteLine("Analysis Result:");
-            var readyCount = identified.MediaFilesWithDates.Count;
-            var sidecarCount = associated.AssociatedFiles.Count;
-            var missingDateCount = identified.MediaFilesWithoutDates.Count;
-            var identificationErrorCount = identified.ErroredFiles.Count;
-            var unsupportedCount = associated.RemainingIgnoredFiles.Count;
-            Console.WriteLine($"  New media:    {readyCount} files");
-            Console.WriteLine($"  Sidecars:     {sidecarCount} related files");
-            Console.WriteLine($"  Missing date: {missingDateCount} files (no metadata)");
-            Console.WriteLine($"  Unsupported:  {unsupportedCount} files (skipped)");
+            ReportIdentificationResults(directoryStructure, identified, associated);
 
-            if (identificationErrorCount > 0)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"  Errors:       {identificationErrorCount} files (failed to open/parse)");
-                Console.ResetColor();
-            }
+            outputService.Header("[Step 2/2] Sorting");
 
-            ReportDiscoveryAlerts(directoryStructure, missingDateCount, identified.ErroredFiles);
-
-            Console.WriteLine();
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
-            Console.WriteLine("[Step 2/2] Sorting");
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
-
-            int totalFilesToMove = readyCount + sidecarCount;
-            var targetFolderCount = identified.MediaFilesWithDates
-                .Select(f => f.CreatedOn.Date.ToString("yyyy-MM-dd"))
+            int totalFilesToMove =
+                identified.MediaFilesWithDates.Count + associated.AssociatedFiles.Count;
+            var targetFolderCount = identified
+                .MediaFilesWithDates.Select(f => f.CreatedOn.Date.ToString("yyyy-MM-dd"))
                 .Distinct()
                 .Count();
 
             if (totalFilesToMove == 0)
             {
-                Console.WriteLine("No new media files found to sort.");
+                outputService.WriteLine("  No new media files found to sort.");
+                outputService.WriteLine();
+                outputService.WriteLine(MediaSorterConstants.Separator);
+                outputService.WriteLine();
                 return;
             }
 
-            Console.WriteLine($"Full plan available in: {logPath}");
-            if (ConsoleHelper.AskYesNoQuestion($"Action: Sort {totalFilesToMove} file(s) into {targetFolderCount} date folder(s)?", ConsoleKey.N) != ConsoleKey.Y)
+            if (
+                !outputService.Confirm(
+                    $"Action: Sort {totalFilesToMove} file(s) into {targetFolderCount} date folder(s)?"
+                )
+            )
             {
-                Console.WriteLine("Result: Operation aborted.");
+                outputService.WriteLine("  Operation aborted.");
+                outputService.WriteLine();
+                outputService.WriteLine(MediaSorterConstants.Separator);
+                outputService.WriteLine();
                 return;
             }
 
-            timeZoneAdjusterService.ApplyOffsetsIfNeeded(identified.MediaFilesWithDates);
-
-            var sortingResult = ConsoleHelper.ExecuteWithProgress("Status: Sorting",
-                p => mediaSortingService.Sort(identified.MediaFilesWithDates, directoryStructure.DateToExistingDirectoryMapping, p));
-            LogSorting(sortingResult);
-
+            var sortingResult = outputService.ExecuteWithProgress(
+                "  Sorting media",
+                p =>
+                    mediaSortingService.Sort(
+                        identified.MediaFilesWithDates,
+                        directoryStructure.DateToExistingDirectoryMapping,
+                        p
+                    )
+            );
             if (sortingResult.Moved.Count > 0)
             {
-                Console.WriteLine($"Result: {sortingResult.Moved.Count} files moved.");
+                outputService.WriteLine($"  Result: {sortingResult.Moved.Count} files moved.");
             }
             else if (sortingResult.Duplicates.Count > 0)
             {
-                Console.WriteLine("Result: All files are already organised.");
+                outputService.WriteLine("  Result: All files are already organised.");
             }
 
             if (sortingResult.Errors.Count > 0)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"(!) {sortingResult.Errors.Count} file(s) failed due to errors:");
-
-                foreach (var error in sortingResult.Errors.Take(5))
-                    Console.WriteLine($"    - {Path.GetFileName(error.SourcePath)}: {error.Exception.Message}");
-
-                if (sortingResult.Errors.Count > 5)
-                    Console.WriteLine("    - ... (see logs for more)");
-
-                Console.ResetColor();
+                outputService.List(
+                    "Sorting Errors:",
+                    sortingResult
+                        .Errors.OrderByPath(x => x.SourcePath)
+                        .Select(e => $"{GetRelativePath(e.SourcePath)}: {e.Exception.Message}"),
+                    OutputLevel.Error
+                );
             }
+            outputService.WriteLine();
+
+            LogSorting(sortingResult);
 
             HandleDuplicates(sortingResult.Duplicates);
 
-            Console.WriteLine();
-            Console.WriteLine($"Processing complete. Audit log: {logPath}");
+            outputService.Complete();
         }
         catch (Exception ex)
         {
-            LogError("A critical error occurred during processing.", ex);
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n[FATAL ERROR] {ex.Message}");
-            Console.WriteLine($"Details logged to: {logPath}");
-            Console.ResetColor();
+            outputService.Fatal("A critical error occurred during processing.", ex);
         }
     }
 
@@ -152,214 +143,221 @@ public class IdentifyAndSortNewMediaProcessor(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(e => e);
 
-        Console.WriteLine($"Configuration:");
-        Console.WriteLine($"  Directory:      {options.Value.Directory}");
-        Console.WriteLine($"  Extensions:     {string.Join(", ", allExtensions)}");
-        Console.WriteLine($"  Folder format:  {options.Value.FolderNameFormat}");
-        Console.WriteLine();
+        outputService.Table(
+            "Configuration:",
+            [
+                new("Directory:", options.Value.Directory),
+                new("Log file:", outputService.LogFileName),
+                new("Extensions:", string.Join(", ", allExtensions)),
+                new("Folder format:", options.Value.FolderNameFormat),
+            ]
+        );
     }
 
-    private static void ReportDiscoveryAlerts(
-         DirectoryStructure structure,
-         int missingDateCount,
-         IReadOnlyList<FileIdentificationError> identificationErrors)
+    private void ReportIdentificationResults(
+        DirectoryStructure directoryStructure,
+        IdentifiedMedia identified,
+        AssociatedMedia associated
+    )
     {
-        var hasConflicts = structure.DateToIgnoredDirectoriesMapping.Count > 0;
-        if (!hasConflicts && missingDateCount == 0 && identificationErrors.Count == 0) return;
+        var readyCount = identified.MediaFilesWithDates.Count;
+        var sidecarCount = associated.AssociatedFiles.Count;
+        var missingDateCount = identified.MediaFilesWithoutDates.Count;
+        var identificationErrorCount = identified.ErroredFiles.Count;
+        var unsupportedCount = associated.RemainingIgnoredFiles.Count;
 
-        Console.WriteLine();
-        Console.WriteLine("(!) Discovery Alerts:");
-
-        if (hasConflicts)
+        var alerts = new List<string>();
+        if (directoryStructure.DateToIgnoredDirectoriesMapping.Count > 0)
         {
-            int dateConflictCount = structure.DateToIgnoredDirectoriesMapping.Count;
-            string dateWord = dateConflictCount == 1 ? "date has" : "dates have";
-            Console.WriteLine($"    - {dateConflictCount} {dateWord} multiple folders mapped.");
+            string dateWord =
+                directoryStructure.DateToIgnoredDirectoriesMapping.Count == 1
+                    ? "date has"
+                    : "dates have";
+            alerts.Add(
+                $"{directoryStructure.DateToIgnoredDirectoriesMapping.Count} {dateWord} multiple folders mapped."
+            );
         }
 
         if (missingDateCount > 0)
         {
-            Console.WriteLine($"    - {missingDateCount} file(s) skipped: Supported file type, but no date metadata found.");
+            alerts.Add(
+                $"{missingDateCount} file(s) skipped: Supported file type, but no date metadata found."
+            );
         }
 
-        if (identificationErrors.Count > 0)
+        outputService.Table(
+            "Analysis result:",
+            [
+                new("New media:", readyCount.ToString()),
+                new("Sidecars:", sidecarCount.ToString()),
+                new("Missing date:", missingDateCount.ToString()),
+                new("Unsupported:", unsupportedCount.ToString()),
+                new("Alerts:", alerts.Count.ToString(), alerts.Count > 0),
+                new("Errors:", identificationErrorCount.ToString(), identificationErrorCount > 0),
+            ]
+        );
+
+        if (alerts.Count > 0)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"    - {identificationErrors.Count} file(s) could not be read due to errors:");
-
-            foreach (var error in identificationErrors.Take(5))
-                Console.WriteLine($"      - {Path.GetFileName(error.FilePath)}: {error.Exception.Message}");
-
-            if (identificationErrors.Count > 5)
-                Console.WriteLine("      - ... (see logs for more)");
-
-            Console.ResetColor();
-        }
-    }
-
-    private void HandleDuplicates(IReadOnlyList<DuplicateDetectedFileMove> duplicates)
-    {
-        if (duplicates.Count == 0) return;
-
-        Console.WriteLine();
-        Console.WriteLine("Duplicate Management:");
-        if (ConsoleHelper.AskYesNoQuestion($"  Action: Delete {duplicates.Count} exact duplicates?", ConsoleKey.N) != ConsoleKey.Y)
-        {
-            Console.WriteLine("  Result: Operation aborted.");
-            return;
+            outputService.List("Alerts:", alerts, OutputLevel.Warn);
+            outputService.WriteLine("", OutputLevel.Warn);
         }
 
-        var deletedFiles = new List<string>();
-        var deletionErrors = new List<(string FilePath, Exception Exception)>();
-
-        ConsoleHelper.ExecuteWithProgress("  Status: Cleaning up", p =>
+        if (identificationErrorCount > 0)
         {
-            for (int i = 0; i < duplicates.Count; i++)
-            {
-                var duplicateFile = duplicates[i];
-                try
-                {
-                    var fileInfo = new FileInfo(duplicateFile.SourcePath);
-                    if (fileInfo.Exists)
-                    {
-                        fileInfo.Delete();
-                        deletedFiles.Add(duplicateFile.SourcePath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    deletionErrors.Add((duplicateFile.SourcePath, ex));
-                }
-                p.Report((double)(i + 1) / duplicates.Count);
-            }
-            return true;
-        });
-
-        LogDeletedDuplicates(deletedFiles, deletionErrors);
-        Console.WriteLine($"  Result: Deleted {deletedFiles.Count} files.");
-
-        if (deletionErrors.Count > 0)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  (!) Failed to delete {deletionErrors.Count} file(s).");
-            foreach (var error in deletionErrors.Take(5))
-            {
-                Console.WriteLine($"      - {Path.GetFileName(error.FilePath)}: {error.Exception.Message}");
-            }
-
-            if (deletionErrors.Count > 5)
-                Console.WriteLine("      - ... (see logs for more)");
-            Console.ResetColor();
+            var errors = identified
+                .ErroredFiles.OrderByPath(x => x.FilePath)
+                .Select(error => $"{GetRelativePath(error.FilePath)}: {error.Exception.Message}");
+            outputService.List("Errors:", errors, OutputLevel.Error);
+            outputService.WriteLine("", OutputLevel.Error);
         }
-    }
-
-    private void LogIdentification(IdentifiedMedia identified, AssociatedMedia associated)
-    {
-        auditLogService.LogHeader("STEP 1: IDENTIFICATION RESULTS");
 
         if (identified.MediaFilesWithDates.Any())
         {
-            auditLogService.LogLine("\n[Ready to Move - Grouped by Target Date]");
-            var groups = identified.MediaFilesWithDates
-                .GroupBy(f => f.CreatedOn.Date.ToString("yyyy-MM-dd"))
+            outputService.Header("Ready to move", OutputLevel.Debug);
+            var groups = identified
+                .MediaFilesWithDates.GroupBy(f => f.CreatedOn.Date.ToString("yyyy-MM-dd"))
                 .OrderBy(g => g.Key);
 
             foreach (var group in groups)
             {
-                auditLogService.LogLine($"\nFolder: {group.Key}");
-                foreach (var file in group)
+                outputService.WriteLine($"Folder: {group.Key}", OutputLevel.Debug);
+                foreach (var file in group.OrderByPath(f => f.FilePath))
                 {
-                    auditLogService.LogLine($"  - [Media]   {file.FilePath}");
-                    foreach (var sidecar in file.RelatedFiles)
+                    string[] paths = [file.FilePath, .. file.RelatedFiles];
+                    foreach (var path in paths.OrderByPath(p => p))
                     {
-                        auditLogService.LogLine($"  - [Sidecar] {sidecar}");
+                        outputService.WriteLine($"  {GetRelativePath(path)}", OutputLevel.Debug);
                     }
                 }
+                outputService.WriteLine("", OutputLevel.Debug);
             }
         }
 
         if (identified.MediaFilesWithoutDates.Any())
         {
-            auditLogService.LogLine("\n[Missing Metadata - Will be Skipped]");
-            auditLogService.LogBulletPoints(
-                identified.MediaFilesWithoutDates.Select(f => $"SKIP:  {f.FilePath}"));
+            outputService.Header("Missing metadata", OutputLevel.Debug);
+            foreach (var file in identified.MediaFilesWithoutDates.OrderByPath(f => f.FilePath))
+            {
+                outputService.WriteLine($"  {GetRelativePath(file.FilePath)}", OutputLevel.Debug);
+            }
+            outputService.WriteLine("", OutputLevel.Debug);
         }
 
         if (associated.RemainingIgnoredFiles.Any())
         {
-            auditLogService.LogLine("\n[Ignored / Unsupported Files]");
-            auditLogService.LogBulletPoints(
-                associated.RemainingIgnoredFiles.Select(f => $"IGNORE: {f}"));
+            outputService.Header("Unsupported files", OutputLevel.Debug);
+            foreach (var file in associated.RemainingIgnoredFiles.OrderByPath(p => p))
+            {
+                outputService.WriteLine($"  {GetRelativePath(file)}", OutputLevel.Debug);
+            }
+            outputService.WriteLine("", OutputLevel.Debug);
         }
+    }
 
-        if (identified.ErroredFiles.Any())
+    private void HandleDuplicates(IReadOnlyList<DuplicateDetectedFileMove> duplicates)
+    {
+        if (duplicates.Count == 0)
+            return;
+
+        if (!outputService.Confirm($"Action: Delete {duplicates.Count} exact duplicates?"))
         {
-            auditLogService.LogLine("\n[Technical Errors]");
-            auditLogService.LogBulletPoints(
-                identified.ErroredFiles.Select(err => $"ERROR: {err.FilePath} (Exception: {err.Exception.Message})"));
+            outputService.WriteLine("  Duplicate cleanup aborted.");
+            outputService.WriteLine();
+            return;
         }
 
-        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
-        auditLogService.Flush();
+        var deletedFiles = new List<string>();
+        var deletionErrors = new List<(string FilePath, string ExceptionMessage)>();
+
+        outputService.ExecuteWithProgress(
+            "  Cleaning up duplicates",
+            p =>
+            {
+                for (int i = 0; i < duplicates.Count; i++)
+                {
+                    var duplicateFile = duplicates[i];
+                    try
+                    {
+                        var fileInfo = new FileInfo(duplicateFile.SourcePath);
+                        if (fileInfo.Exists)
+                        {
+                            fileInfo.Delete();
+                            deletedFiles.Add(duplicateFile.SourcePath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        deletionErrors.Add((duplicateFile.SourcePath, ex.Message));
+                    }
+                    p.Report((double)(i + 1) / duplicates.Count);
+                }
+                return true;
+            }
+        );
+
+        outputService.WriteLine($"  Result: Deleted {deletedFiles.Count} file(s).");
+        outputService.WriteLine();
+
+        if (deletedFiles.Count != 0)
+        {
+            outputService.Header("Deleted", OutputLevel.Debug);
+            foreach (var file in deletedFiles.OrderBy(f => f))
+            {
+                outputService.WriteLine($"  {GetRelativePath(file)}", OutputLevel.Debug);
+            }
+            outputService.WriteLine("", OutputLevel.Debug);
+        }
+
+        if (deletionErrors.Count > 0)
+        {
+            outputService.List(
+                "Deletion failures:",
+                deletionErrors
+                    .OrderByPath(x => x.FilePath)
+                    .Select(error =>
+                        $"{GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
+                    ),
+                OutputLevel.Error
+            );
+            outputService.WriteLine("", OutputLevel.Error);
+        }
     }
 
     private void LogSorting(SortedMedia result)
     {
-        auditLogService.LogHeader("STEP 2: SORTING RESULTS");
-
         if (result.Moved.Any())
         {
-            auditLogService.LogLine("\n[Successfully Moved]");
-            auditLogService.LogBulletPoints(
-                result.Moved.Select(m => $"MOVED: {m.SourcePath} -> {m.DestinationPath}"));
+            outputService.Header("Successfully moved", OutputLevel.Debug);
+            foreach (var m in result.Moved.OrderByPath(m => m.SourcePath))
+            {
+                outputService.WriteLine(
+                    $"  {GetRelativePath(m.SourcePath)} -> {GetRelativePath(m.DestinationPath)}",
+                    OutputLevel.Debug
+                );
+            }
+            outputService.WriteLine("", OutputLevel.Debug);
         }
 
         if (result.Duplicates.Any())
         {
-            auditLogService.LogLine("\n[Duplicates Detected - Already exist at destination]");
-            auditLogService.LogBulletPoints(
-                result.Duplicates.Select(d => $"SKIP:  {d.SourcePath} == {d.DestinationPath}"));
+            outputService.Header("Duplicates detected", OutputLevel.Debug);
+            foreach (var d in result.Duplicates.OrderByPath(d => d.SourcePath))
+            {
+                outputService.WriteLine(
+                    $"  {GetRelativePath(d.SourcePath)} == {GetRelativePath(d.DestinationPath)}",
+                    OutputLevel.Debug
+                );
+            }
+            outputService.WriteLine("", OutputLevel.Debug);
         }
-
-        if (result.Errors.Any())
-        {
-            auditLogService.LogLine("\n[Errors - Failed to Move]");
-            auditLogService.LogBulletPoints(
-                result.Errors.Select(err => $"FAIL:  {err.SourcePath} -> Reason: {err.Exception.Message}"));
-        }
-
-        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
-        auditLogService.Flush();
     }
 
-    private void LogDeletedDuplicates(
-        IReadOnlyList<string> deletedFilePaths,
-        IReadOnlyList<(string FilePath, Exception Exception)> errors)
+    private string GetRelativePath(string? path)
     {
-        auditLogService.LogHeader("CLEANUP RESULTS");
+        if (path == null)
+            return string.Empty;
 
-        if (deletedFilePaths.Any())
-        {
-            auditLogService.LogLine("\n[Deleted Successfully]");
-            auditLogService.LogBulletPoints(
-                deletedFilePaths.Select(path => $"DELETED: {path}"));
-        }
-
-        if (errors.Any())
-        {
-            auditLogService.LogLine("\n[Deletion Failures]");
-            auditLogService.LogBulletPoints(
-                errors.Select(err => $"ERROR:   {err.FilePath} -> Reason: {err.Exception.Message}"));
-        }
-
-        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
-        auditLogService.Flush();
-    }
-
-    private void LogError(string message, Exception ex)
-    {
-        auditLogService.LogError(message, ex);
-        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
-        auditLogService.Flush();
+        return Path.GetRelativePath(options.Value.Directory, path);
     }
 }

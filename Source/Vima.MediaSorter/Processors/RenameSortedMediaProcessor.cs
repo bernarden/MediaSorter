@@ -1,12 +1,12 @@
-﻿using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.Services.MediaFileHandlers;
-using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Processors;
 
@@ -16,7 +16,7 @@ public class RenameSortedMediaProcessor(
     ITimeZoneAdjustmentService timeZoneAdjusterService,
     IRelatedFilesDiscoveryService relatedFileDiscoveryService,
     IEnumerable<IMediaFileHandler> mediaFileHandlers,
-    IAuditLogService auditLogService,
+    IOutputService outputService,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
@@ -24,29 +24,29 @@ public class RenameSortedMediaProcessor(
 
     public void Process()
     {
-        string logPath = auditLogService.Initialise();
+        outputService.Start("Rename media in sorted folders");
 
         try
         {
             OutputConfiguration();
 
-            Console.WriteLine("[Step 1/2] Identification & planning");
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
+            outputService.Header("[Step 1/2] Identification");
 
-            var directoryStructure = ConsoleHelper.ExecuteWithProgress(
+            var directoryStructure = outputService.ExecuteWithProgress(
                 "Identifying directories",
                 directoryIdentifingService.Identify
             );
             if (directoryStructure.SortedFolders.Count == 0)
             {
-                Console.WriteLine("No sorted folders found to process.");
+                outputService.WriteLine("  No sorted folders found to process.");
+                outputService.WriteLine();
                 return;
             }
 
             var foldersToScan = directoryStructure
                 .SortedFolders.Concat(directoryStructure.SortedSubFolders)
                 .ToList();
-            var identified = ConsoleHelper.ExecuteWithProgress(
+            var identified = outputService.ExecuteWithProgress(
                 "Identifying media files",
                 p => mediaIdentifyingService.Identify(foldersToScan, p)
             );
@@ -62,45 +62,120 @@ public class RenameSortedMediaProcessor(
 
             var renamePlan = GenerateRenamePlan(identified.MediaFilesWithDates);
 
-            OutputAnalysis(
+            ReportAnalysisResults(
                 identified,
                 associated,
                 renamePlan,
                 directoryStructure.SortedFolders.Count,
-                timeZoneAdjustedFilePaths.Count,
-                logPath
+                timeZoneAdjustedFilePaths.Count
             );
 
-            Console.WriteLine("[Step 2/2] Renaming");
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
+            outputService.Header("[Step 2/2] Renaming");
 
             if (renamePlan.Count == 0)
             {
-                Console.WriteLine("All files already match the naming convention.");
+                outputService.WriteLine("  All files already match the naming convention.");
+                outputService.WriteLine();
+                outputService.WriteLine(MediaSorterConstants.Separator);
+                outputService.WriteLine();
                 return;
             }
 
-            if (ConsoleHelper.AskYesNoQuestion(
-                    $"Action: Rename {renamePlan.Count} file(s)?",
-                    ConsoleKey.N) != ConsoleKey.Y
-            )
+            if (!outputService.Confirm($"Action: Rename {renamePlan.Count} file(s)?"))
             {
-                Console.WriteLine("Result: Operation aborted.");
+                outputService.WriteLine("  Operation aborted.");
+                outputService.WriteLine();
+                outputService.WriteLine(MediaSorterConstants.Separator);
+                outputService.WriteLine();
                 return;
             }
 
             ExecuteRenaming(renamePlan);
 
-            Console.WriteLine();
-            Console.WriteLine($"Processing complete. Audit log: {logPath}");
+            outputService.Complete();
         }
         catch (Exception ex)
         {
-            LogError("A critical error occurred during processing.", ex);
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n[FATAL ERROR] {ex.Message}");
-            Console.WriteLine($"Details logged to: {logPath}");
-            Console.ResetColor();
+            outputService.Fatal("A critical error occurred during processing.", ex);
+        }
+    }
+
+    private void OutputConfiguration()
+    {
+        var allExtensions = mediaFileHandlers
+            .SelectMany(h => h.SupportedExtensions)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(e => e);
+
+        outputService.Table(
+            "Configuration:",
+            [
+                new("Directory:", options.Value.Directory),
+                new("Log file:", outputService.LogFileName),
+                new("Extensions:", string.Join(", ", allExtensions)),
+                new("Default format:", MediaSorterConstants.StandardDateFormat),
+                new("Burst format:", MediaSorterConstants.PrecisionDateFormat),
+            ]
+        );
+    }
+
+    private void ReportAnalysisResults(
+        IdentifiedMedia identified,
+        AssociatedMedia associated,
+        List<(string Source, string Destination)> plan,
+        int folderCount,
+        int timeZoneAdjusted
+    )
+    {
+        outputService.Table(
+            "Analysis result:",
+            [
+                new("Sorted folders:", folderCount.ToString()),
+                new("Media found:", identified.MediaFilesWithDates.Count.ToString()),
+                new(
+                    "Sidecars linked:",
+                    identified.MediaFilesWithDates.Sum(f => f.RelatedFiles.Count).ToString()
+                ),
+                new("Unsupported:", associated.RemainingIgnoredFiles.Count.ToString()),
+                new("Files to rename:", plan.Count.ToString()),
+                new("TZ adjusted:", timeZoneAdjusted.ToString(), timeZoneAdjusted > 0),
+                new(
+                    "Errors:",
+                    identified.ErroredFiles.Count.ToString(),
+                    identified.ErroredFiles.Any()
+                ),
+            ]
+        );
+
+        if (identified.ErroredFiles.Any())
+        {
+            var errors = identified
+                .ErroredFiles.OrderBy(e => e.FilePath)
+                .Select(e => $"{GetRelativePath(e.FilePath)}: {e.Exception.Message}");
+            outputService.List("Errors:", errors, OutputLevel.Error);
+            outputService.WriteLine("", OutputLevel.Error);
+        }
+
+        if (plan.Count != 0)
+        {
+            outputService.Header("Proposed rename plan", OutputLevel.Debug);
+            var folderGroups = plan.GroupBy(p => Path.GetDirectoryName(p.Source))
+                .OrderBy(g => g.Key);
+            foreach (var folderGroup in folderGroups)
+            {
+                outputService.WriteLine(
+                    $"Folder: {GetRelativePath(folderGroup.Key)}",
+                    OutputLevel.Debug
+                );
+                foreach (var (Source, Destination) in folderGroup.OrderBy(p => p.Source))
+                {
+                    outputService.WriteLine(
+                        $"  {Path.GetFileName(Source)} -> {Path.GetFileName(Destination)}",
+                        OutputLevel.Debug
+                    );
+                }
+                outputService.WriteLine("", OutputLevel.Debug);
+            }
         }
     }
 
@@ -180,8 +255,8 @@ public class RenameSortedMediaProcessor(
         var moved = new List<(string Source, string Destination)>();
         var errors = new List<(string Source, string Destination, Exception Exception)>();
 
-        ConsoleHelper.ExecuteWithProgress(
-            "Status: Renaming",
+        outputService.ExecuteWithProgress(
+            "  Renaming files",
             p =>
             {
                 for (int i = 0; i < plan.Count; i++)
@@ -201,55 +276,34 @@ public class RenameSortedMediaProcessor(
                 return true;
             }
         );
-
-        LogExecutionResults(moved, errors);
-
-        Console.WriteLine($"Result: {moved.Count} files renamed.");
-        if (errors.Count > 0)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"(!) {errors.Count} error(s) encountered (see log for details).");
-
-            foreach (var error in errors.Take(5))
-                Console.WriteLine(
-                    $"    - {Path.GetFileName(error.Source)}: {error.Exception.Message}"
-                );
-
-            if (errors.Count > 5)
-                Console.WriteLine("    - ... (see logs for more)");
-
-            Console.ResetColor();
-        }
-    }
-
-    private void LogExecutionResults(
-        List<(string Source, string Destination)> moved,
-        List<(string Source, string Destination, Exception Exception)> errors
-    )
-    {
-        auditLogService.LogHeader("Execution results");
+        outputService.WriteLine($"  Result: {moved.Count} files renamed.");
+        outputService.WriteLine();
 
         if (moved.Count > 0)
         {
-            auditLogService.LogLine("\n[Successfully renamed]");
-            auditLogService.LogBulletPoints(
-                moved.Select(m => $"RENAME: {m.Source} -> {Path.GetFileName(m.Destination)}")
+            outputService.List(
+                "Successfully renamed:",
+                moved
+                    .OrderByPath(m => m.Source)
+                    .Select(m =>
+                        $"  {Path.GetFileName(m.Source)} -> {Path.GetFileName(m.Destination)}"
+                    ),
+                OutputLevel.Debug
             );
+            outputService.WriteLine("", OutputLevel.Debug);
         }
 
         if (errors.Count > 0)
         {
-            auditLogService.LogLine("\n[Errors - Failed to rename]");
-            auditLogService.LogBulletPoints(
-                errors.Select(e => $"FAIL:   {e.Source} -> Reason: {e.Exception.Message}")
+            outputService.List(
+                "Failed to rename:",
+                errors
+                    .OrderByPath(m => m.Source)
+                    .Select(e => $"{Path.GetFileName(e.Source)}: {e.Exception.Message}"),
+                OutputLevel.Error
             );
+            outputService.WriteLine("", OutputLevel.Error);
         }
-
-        auditLogService.LogLine(
-            $"\nExecution Summary: {moved.Count} success, {errors.Count} errors."
-        );
-        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
-        auditLogService.Flush();
     }
 
     private void TryEnhanceMetadata(MediaFileWithDate file)
@@ -264,110 +318,11 @@ public class RenameSortedMediaProcessor(
             file.SetCreatedOn(highPrecisionDate);
     }
 
-    private void OutputConfiguration()
+    private string GetRelativePath(string? path)
     {
-        var allExtensions = mediaFileHandlers
-            .SelectMany(h => h.SupportedExtensions)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(e => e);
+        if (path == null)
+            return string.Empty;
 
-        var config = new[]
-        {
-            "Configuration:",
-            $"  Directory:      {options.Value.Directory}",
-            $"  Extensions:     {string.Join(", ", allExtensions)}",
-            $"  Default format: {MediaSorterConstants.StandardDateFormat}",
-            $"  Burst format:   {MediaSorterConstants.PrecisionDateFormat}",
-            "",
-        };
-
-        foreach (var line in config)
-        {
-            Console.WriteLine(line);
-            auditLogService.LogLine(line);
-        }
-        auditLogService.Flush();
-    }
-
-    private void OutputAnalysis(
-        IdentifiedMedia identified,
-        AssociatedMedia associated,
-        List<(string, string)> plan,
-        int folderCount,
-        int timeZoneAdjusted,
-        string logPath
-    )
-    {
-        var summary = new List<string>
-        {
-            $"",
-            $"Analysis Result:",
-            $"  Sorted folders:      {folderCount}",
-            $"  Media identified:    {identified.MediaFilesWithDates.Count}",
-            $"  Sidecars linked:     {identified.MediaFilesWithDates.Sum(f => f.RelatedFiles.Count)}",
-            $"  Ignored/Unknown:     {associated.RemainingIgnoredFiles.Count}",
-        };
-
-        if (timeZoneAdjusted > 0)
-            summary.Add($"  Time zone adjusted:  {timeZoneAdjusted}");
-
-        if (identified.ErroredFiles.Count > 0)
-            summary.Add($"  Errors:              {identified.ErroredFiles.Count} (see log)");
-
-        summary.Add($"  Files to rename:     {plan.Count}");
-        summary.Add($"  Audit log:           {logPath}");
-        summary.Add("");
-
-        foreach (var line in summary)
-        {
-            Console.WriteLine(line);
-            auditLogService.LogLine(line);
-        }
-
-        if (identified.ErroredFiles.Any())
-        {
-            auditLogService.LogLine("\n[Technical Errors - Identification Failed]");
-            auditLogService.LogBulletPoints(
-                identified.ErroredFiles.Select(err =>
-                    $"ERROR: {err.FilePath} (Exception: {err.Exception.Message})"
-                )
-            );
-            auditLogService.LogLine($"\n{ConsoleHelper.TaskSeparator}");
-        }
-
-        if (plan.Count != 0)
-        {
-            LogRenamePlan(plan);
-        }
-
-        auditLogService.Flush();
-    }
-
-    private void LogRenamePlan(IReadOnlyList<(string Source, string Destination)> plan)
-    {
-        auditLogService.LogHeader("Proposed rename plan");
-
-        var folderGroups = plan.GroupBy(p => Path.GetDirectoryName(p.Source)).OrderBy(g => g.Key);
-        foreach (var folderGroup in folderGroups)
-        {
-            auditLogService.LogLine($"\nFolder: {folderGroup.Key}");
-            auditLogService.LogLine(ConsoleHelper.TaskSeparator);
-
-            foreach (var (Source, Destination) in folderGroup)
-            {
-                auditLogService.LogLine(
-                    $"  {Path.GetFileName(Source)} -> {Path.GetFileName(Destination)}"
-                );
-            }
-        }
-
-        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
-    }
-
-    private void LogError(string message, Exception ex)
-    {
-        auditLogService.LogError(message, ex);
-        auditLogService.LogLine($"\n{ConsoleHelper.TaskSeparator}\n");
-        auditLogService.Flush();
+        return Path.GetRelativePath(options.Value.Directory, path);
     }
 }
