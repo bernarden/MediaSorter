@@ -4,5 +4,5 @@ public enum CreatedOnSource
 {
     FileName,
     MetadataUtc,
-    MetadataLocal
+    MetadataLocal,
 }

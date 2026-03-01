@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.UI;
 
@@ -21,7 +21,11 @@ public interface IOutputService
     void Fatal(string context, Exception ex);
 
     void Header(string title, OutputLevel level = OutputLevel.Info);
-    void Table(string title, IEnumerable<OutputTableRow> items, OutputLevel level = OutputLevel.Info);
+    void Table(
+        string title,
+        IEnumerable<OutputTableRow> items,
+        OutputLevel level = OutputLevel.Info
+    );
     void List(string title, IEnumerable<string> items, OutputLevel level = OutputLevel.Info);
 
     bool Confirm(string question, ConsoleKey defaultAnswer = ConsoleKey.N);

@@ -9,17 +9,23 @@ namespace Vima.MediaSorter.Services;
 
 public interface IRelatedFilesDiscoveryService
 {
-    AssociatedMedia AssociateRelatedFiles(IEnumerable<MediaFile> identifiedFiles, IEnumerable<string> ignoredFiles);
+    AssociatedMedia AssociateRelatedFiles(
+        IEnumerable<MediaFile> identifiedFiles,
+        IEnumerable<string> ignoredFiles
+    );
 }
 
 public partial class RelatedFilesDiscoveryService : IRelatedFilesDiscoveryService
 {
-    public AssociatedMedia AssociateRelatedFiles(IEnumerable<MediaFile> identifiedFiles, IEnumerable<string> ignoredFiles)
+    public AssociatedMedia AssociateRelatedFiles(
+        IEnumerable<MediaFile> identifiedFiles,
+        IEnumerable<string> ignoredFiles
+    )
     {
         var associated = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var ignoredIndex = ignoredFiles
-                .GroupBy(f => Path.ChangeExtension(f, null), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(f => Path.ChangeExtension(f, null), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
         void ClaimFiles(string lookupPath, MediaFile target)
         {
@@ -50,7 +56,11 @@ public partial class RelatedFilesDiscoveryService : IRelatedFilesDiscoveryServic
             (associated.Contains(f) ? associatedList : remainingList).Add(f);
         }
 
-        return new AssociatedMedia() { AssociatedFiles = associatedList, RemainingIgnoredFiles = remainingList };
+        return new AssociatedMedia()
+        {
+            AssociatedFiles = associatedList,
+            RemainingIgnoredFiles = remainingList,
+        };
     }
 
     [GeneratedRegex(@"G[HX](\d{2}|\w{2})\d{4}", RegexOptions.IgnoreCase)]

@@ -7,5 +7,5 @@ public enum ProcessorOptions
     IdentifyAndSortNewMedia = 1,
     FindDuplicates = 2,
     RenameSortedMedia = 3,
-    CleanupRawMedia = 4
+    CleanupRawMedia = 4,
 }

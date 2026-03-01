@@ -1,10 +1,10 @@
-﻿using SkiaSharp;
-using System;
+﻿using System;
+using SkiaSharp;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Infrastructure.Hashers;
 
-public class PerceptualVisualFileHasher : VisualFileHasherBase
+public class PerceptualVisualFileHasher(IFileSystem fileSystem) : VisualFileHasherBase(fileSystem)
 {
     public override VisualHasherType Type => VisualHasherType.Perceptual;
 

@@ -12,12 +12,19 @@ namespace Vima.MediaSorter.Services;
 
 public interface IMediaIdentificationService
 {
-    IdentifiedMedia Identify(IEnumerable<string> directoriesToScan, IProgress<double>? progress = null);
+    IdentifiedMedia Identify(
+        IEnumerable<string> directoriesToScan,
+        IProgress<double>? progress = null
+    );
 }
 
-public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFileHandlers) : IMediaIdentificationService
+public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFileHandlers)
+    : IMediaIdentificationService
 {
-    public IdentifiedMedia Identify(IEnumerable<string> directoriesToScan, IProgress<double>? progress = null)
+    public IdentifiedMedia Identify(
+        IEnumerable<string> directoriesToScan,
+        IProgress<double>? progress = null
+    )
     {
         List<string> filePaths = [.. directoriesToScan.SelectMany(Directory.EnumerateFiles)];
         if (filePaths.Count == 0)
@@ -31,19 +38,29 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         ConcurrentBag<MediaFile> mediaFilesWithoutDates = new();
         ConcurrentBag<FileIdentificationError> erroredFiles = new();
         ConcurrentBag<string> unsupportedFiles = new();
-        Parallel.ForEach(filePaths, new() { MaxDegreeOfParallelism = 25 }, filePath =>
-        {
-            ProcessFilePath(filePath, mediaFilesWithDates, mediaFilesWithoutDates, erroredFiles, unsupportedFiles);
-            Interlocked.Increment(ref processedFileCounter);
-            progress?.Report((double)processedFileCounter / filePaths.Count);
-        });
+        Parallel.ForEach(
+            filePaths,
+            new() { MaxDegreeOfParallelism = 25 },
+            filePath =>
+            {
+                ProcessFilePath(
+                    filePath,
+                    mediaFilesWithDates,
+                    mediaFilesWithoutDates,
+                    erroredFiles,
+                    unsupportedFiles
+                );
+                Interlocked.Increment(ref processedFileCounter);
+                progress?.Report((double)processedFileCounter / filePaths.Count);
+            }
+        );
 
         return new IdentifiedMedia
         {
             MediaFilesWithDates = [.. mediaFilesWithDates],
             MediaFilesWithoutDates = [.. mediaFilesWithoutDates],
             ErroredFiles = [.. erroredFiles],
-            UnsupportedFiles = [.. unsupportedFiles]
+            UnsupportedFiles = [.. unsupportedFiles],
         };
     }
 
@@ -52,7 +69,8 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         ConcurrentBag<MediaFileWithDate> mediaFilesWithDates,
         ConcurrentBag<MediaFile> mediaFilesWithoutDates,
         ConcurrentBag<FileIdentificationError> erroredFiles,
-        ConcurrentBag<string> unsupportedFiles)
+        ConcurrentBag<string> unsupportedFiles
+    )
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         var handler = mediaFileHandlers.FirstOrDefault(h => h.CanHandle(ext));

@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Infrastructure;
@@ -26,7 +26,7 @@ public class DirectoryResolver(IOptions<MediaSorterOptions> options) : IDirector
         if (directoryName.Length < _options.FolderNameFormat.Length)
             return null;
 
-        string directoryNameBeginning = directoryName.Substring(0, _options.FolderNameFormat.Length);
+        string directoryNameBeginning = directoryName[.._options.FolderNameFormat.Length];
         return DateTime.TryParseExact(
             directoryNameBeginning,
             _options.FolderNameFormat,

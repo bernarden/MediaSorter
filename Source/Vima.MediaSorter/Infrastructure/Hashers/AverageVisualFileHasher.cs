@@ -3,7 +3,7 @@ using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Infrastructure.Hashers;
 
-public class AverageVisualFileHasher : VisualFileHasherBase
+public class AverageVisualFileHasher(IFileSystem fileSystem) : VisualFileHasherBase(fileSystem)
 {
     public override VisualHasherType Type => VisualHasherType.Average;
 

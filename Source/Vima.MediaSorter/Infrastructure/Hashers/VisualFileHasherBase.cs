@@ -1,6 +1,6 @@
-﻿using SkiaSharp;
-using System.IO;
+﻿using System.IO;
 using System.Numerics;
+using SkiaSharp;
 using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Infrastructure.Hashers;
@@ -13,7 +13,7 @@ public interface IVisualFileHasher
     bool IsMatch(ulong hash1, ulong hash2, int threshold);
 }
 
-public abstract class VisualFileHasherBase : IVisualFileHasher
+public abstract class VisualFileHasherBase(IFileSystem fileSystem) : IVisualFileHasher
 {
     public abstract VisualHasherType Type { get; }
 
@@ -23,7 +23,7 @@ public abstract class VisualFileHasherBase : IVisualFileHasher
 
     public ulong GetHash(string path)
     {
-        using var stream = File.OpenRead(path);
+        using var stream = fileSystem.CreateFileStream(path, FileMode.Open, FileAccess.Read);
         using var original = SKBitmap.Decode(stream);
         return GetHash(original);
     }

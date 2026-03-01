@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Options;
-using SkiaSharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,6 +7,8 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using SkiaSharp;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Infrastructure.Hashers;
@@ -19,6 +19,7 @@ namespace Vima.MediaSorter.Processors;
 public class FindDuplicatesProcessor(
     IFileHasher fileHasher,
     IEnumerable<IVisualFileHasher> visualHashers,
+    IFileSystem fileSystem,
     IOutputService outputService,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
@@ -42,7 +43,7 @@ public class FindDuplicatesProcessor(
 
             List<string> allFiles =
             [
-                .. Directory.EnumerateFiles(
+                .. fileSystem.EnumerateFiles(
                     options.Value.Directory,
                     "*",
                     SearchOption.AllDirectories
@@ -150,7 +151,7 @@ public class FindDuplicatesProcessor(
         {
             var errorDetails = errors
                 .OrderByPath(e => e.Path)
-                .Select(e => $"{GetRelativePath(e.Path)}: {e.Ex.Message}");
+                .Select(e => $"{fileSystem.GetRelativePath(e.Path)}: {e.Ex.Message}");
             outputService.List("Errors:", errorDetails, OutputLevel.Error);
             outputService.WriteLine("", OutputLevel.Error);
         }
@@ -176,7 +177,7 @@ public class FindDuplicatesProcessor(
                 {
                     var (size, w, h) = metadata[path];
                     string resolution = w > 0 ? $"{w}x{h}" : "N/A";
-                    return $"{GetRelativePath(path)} [{resolution} | {FormatFileSize(size)}]";
+                    return $"{fileSystem.GetRelativePath(path)} [{resolution} | {FormatFileSize(size)}]";
                 });
 
             foreach (var detail in fileDetails)
@@ -210,21 +211,25 @@ public class FindDuplicatesProcessor(
                     {
                         try
                         {
-                            var info = new FileInfo(path);
-                            var ext = info.Extension.ToLower();
+                            var ext = Path.GetExtension(path).ToLower();
+                            long fileSize = fileSystem.GetFileSize(path);
                             if (visualHasher != null && ImageExtensions.Contains(ext))
                             {
-                                using var stream = File.OpenRead(path);
+                                using var stream = fileSystem.CreateFileStream(
+                                    path,
+                                    FileMode.Open,
+                                    FileAccess.Read
+                                );
                                 using var bitmap =
                                     SKBitmap.Decode(stream)
                                     ?? throw new Exception("Failed to decode the image.");
-                                metadata[path] = (info.Length, bitmap.Width, bitmap.Height);
+                                metadata[path] = (fileSize, bitmap.Width, bitmap.Height);
                                 visualHashes[path] = visualHasher.GetHash(bitmap);
                             }
                             else
                             {
                                 binaryHashes[path] = fileHasher.GetHash(path);
-                                metadata[path] = (info.Length, 0, 0);
+                                metadata[path] = (fileSize, 0, 0);
                             }
                         }
                         catch (Exception ex)
@@ -386,7 +391,7 @@ public class FindDuplicatesProcessor(
             {
                 var (size, w, h) = metadata[path];
                 string resolution = w > 0 ? $"{w}x{h}" : "N/A";
-                string relativePath = Path.GetRelativePath(options.Value.Directory, path);
+                string relativePath = fileSystem.GetRelativePath(path);
                 outputService.WriteLine(
                     $"  - {relativePath} [{resolution} | {FormatFileSize(size)}]"
                 );
@@ -439,7 +444,7 @@ public class FindDuplicatesProcessor(
                     outputService.WriteLine();
 
                 errorOccurred = true;
-                string relative = Path.GetRelativePath(options.Value.Directory, path);
+                string relative = fileSystem.GetRelativePath(path);
                 outputService.WriteLine($"(!) Failed to open {relative}: {ex.Message}");
             }
         }
@@ -460,13 +465,5 @@ public class FindDuplicatesProcessor(
             dblSByte = bytes / 1024.0;
 
         return $"{dblSByte:0.##} {suffix[i]}";
-    }
-
-    private string GetRelativePath(string? path)
-    {
-        if (path == null)
-            return string.Empty;
-
-        return Path.GetRelativePath(options.Value.Directory, path);
     }
 }

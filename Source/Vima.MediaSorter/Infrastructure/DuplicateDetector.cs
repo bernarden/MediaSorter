@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 
 namespace Vima.MediaSorter.Infrastructure;
 
@@ -7,29 +7,15 @@ public interface IDuplicateDetector
     bool AreIdentical(string path1, string path2);
 }
 
-public class DuplicateDetector : IDuplicateDetector
+public class DuplicateDetector(IFileSystem fileSystem) : IDuplicateDetector
 {
     public bool AreIdentical(string path1, string path2)
     {
-        var f1 = new FileInfo(path1);
-        var f2 = new FileInfo(path2);
-        if (f1.Length != f2.Length)
+        if (fileSystem.GetFileSize(path1) != fileSystem.GetFileSize(path2))
             return false;
 
-        using var s1 = new FileStream(
-            path1,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite,
-            bufferSize: 65536
-        );
-        using var s2 = new FileStream(
-            path2,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite,
-            bufferSize: 65536
-        );
+        using var s1 = fileSystem.CreateFileStream(path1, FileMode.Open, FileAccess.Read);
+        using var s2 = fileSystem.CreateFileStream(path2, FileMode.Open, FileAccess.Read);
 
         int b1;
         while ((b1 = s1.ReadByte()) != -1)

@@ -74,6 +74,7 @@ public static class Program
         services.AddTransient<IDuplicateDetector, DuplicateDetector>();
         services.AddTransient<IFileMover, FileMover>();
         services.AddTransient<IDirectoryResolver, DirectoryResolver>();
+        services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IFileHasher, Md5FileHasher>();
         services.AddSingleton<IVisualFileHasher, AverageVisualFileHasher>();
         services.AddSingleton<IVisualFileHasher, DifferenceVisualFileHasher>();

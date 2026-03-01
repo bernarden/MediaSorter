@@ -18,14 +18,14 @@ public interface IMediaSortingService
     );
 }
 
-public class MediaSortingService(
-    IFileMover fileMover,
-    IDirectoryResolver directoryResolver) : IMediaSortingService
+public class MediaSortingService(IFileMover fileMover, IDirectoryResolver directoryResolver)
+    : IMediaSortingService
 {
     public SortedMedia Sort(
         IReadOnlyCollection<MediaFileWithDate> files,
         IDictionary<DateTime, string> dateToExistingDirectoryMapping,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null
+    )
     {
         var successBag = new ConcurrentBag<SuccessfulFileMove>();
         var duplicateBag = new ConcurrentBag<DuplicateDetectedFileMove>();
@@ -33,38 +33,49 @@ public class MediaSortingService(
 
         int processedCounter = 0;
 
-        Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 25 }, file =>
-        {
-            var targetFolder = directoryResolver.GetTargetFolderPath(
-                file.CreatedOn.Date, file.TargetSubFolder, dateToExistingDirectoryMapping);
-
-            foreach (var path in (string[])[file.FilePath, .. file.RelatedFiles])
+        Parallel.ForEach(
+            files,
+            new ParallelOptions { MaxDegreeOfParallelism = 25 },
+            file =>
             {
-                try
+                var targetFolder = directoryResolver.GetTargetFolderPath(
+                    file.CreatedOn.Date,
+                    file.TargetSubFolder,
+                    dateToExistingDirectoryMapping
+                );
+
+                foreach (var path in (string[])[file.FilePath, .. file.RelatedFiles])
                 {
-                    FileMove moveResult = fileMover.Move(path, targetFolder, Path.GetFileName(path));
-                    switch (moveResult)
+                    try
                     {
-                        case SuccessfulFileMove success:
-                            successBag.Add(success);
-                            break;
-                        case DuplicateDetectedFileMove duplicate:
-                            duplicateBag.Add(duplicate);
-                            break;
-                        case ErroredFileMove error:
-                            errorBag.Add(error);
-                            break;
+                        FileMove moveResult = fileMover.Move(
+                            path,
+                            targetFolder,
+                            Path.GetFileName(path)
+                        );
+                        switch (moveResult)
+                        {
+                            case SuccessfulFileMove success:
+                                successBag.Add(success);
+                                break;
+                            case DuplicateDetectedFileMove duplicate:
+                                duplicateBag.Add(duplicate);
+                                break;
+                            case ErroredFileMove error:
+                                errorBag.Add(error);
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        errorBag.Add(new ErroredFileMove(path, targetFolder, ex));
                     }
                 }
-                catch (Exception ex)
-                {
-                    errorBag.Add(new ErroredFileMove(path, targetFolder, ex));
-                }
-            }
 
-            Interlocked.Increment(ref processedCounter);
-            progress?.Report((double)processedCounter / files.Count);
-        });
+                Interlocked.Increment(ref processedCounter);
+                progress?.Report((double)processedCounter / files.Count);
+            }
+        );
 
         return new SortedMedia
         {

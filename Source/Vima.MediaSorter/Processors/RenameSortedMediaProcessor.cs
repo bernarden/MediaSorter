@@ -17,6 +17,7 @@ public class RenameSortedMediaProcessor(
     IRelatedFilesDiscoveryService relatedFileDiscoveryService,
     IEnumerable<IMediaFileHandler> mediaFileHandlers,
     IOutputService outputService,
+    IFileSystem fileSystem,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
@@ -151,7 +152,7 @@ public class RenameSortedMediaProcessor(
         {
             var errors = identified
                 .ErroredFiles.OrderBy(e => e.FilePath)
-                .Select(e => $"{GetRelativePath(e.FilePath)}: {e.Exception.Message}");
+                .Select(e => $"{fileSystem.GetRelativePath(e.FilePath)}: {e.Exception.Message}");
             outputService.List("Errors:", errors, OutputLevel.Error);
             outputService.WriteLine("", OutputLevel.Error);
         }
@@ -164,7 +165,7 @@ public class RenameSortedMediaProcessor(
             foreach (var folderGroup in folderGroups)
             {
                 outputService.WriteLine(
-                    $"Folder: {GetRelativePath(folderGroup.Key)}",
+                    $"Folder: {fileSystem.GetRelativePath(folderGroup.Key)}",
                     OutputLevel.Debug
                 );
                 foreach (var (Source, Destination) in folderGroup.OrderBy(p => p.Source))
@@ -264,7 +265,7 @@ public class RenameSortedMediaProcessor(
                     var op = plan[i];
                     try
                     {
-                        File.Move(op.Source, op.Destination);
+                        fileSystem.Move(op.Source, op.Destination);
                         moved.Add(op);
                     }
                     catch (Exception ex)
@@ -316,13 +317,5 @@ public class RenameSortedMediaProcessor(
         var highPrecisionDate = handler?.GetCreatedOnDateFromMetadata(file.FilePath);
         if (highPrecisionDate != null)
             file.SetCreatedOn(highPrecisionDate);
-    }
-
-    private string GetRelativePath(string? path)
-    {
-        if (path == null)
-            return string.Empty;
-
-        return Path.GetRelativePath(options.Value.Directory, path);
     }
 }

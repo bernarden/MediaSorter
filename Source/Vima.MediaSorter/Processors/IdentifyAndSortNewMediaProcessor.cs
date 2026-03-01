@@ -1,8 +1,7 @@
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Services;
@@ -17,6 +16,7 @@ public class IdentifyAndSortNewMediaProcessor(
     IMediaSortingService mediaSortingService,
     IRelatedFilesDiscoveryService relatedFileDiscoveryService,
     IEnumerable<IMediaFileHandler> mediaFileHandlers,
+    IFileSystem fileSystem,
     IOutputService outputService,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
@@ -118,7 +118,9 @@ public class IdentifyAndSortNewMediaProcessor(
                     "Sorting Errors:",
                     sortingResult
                         .Errors.OrderByPath(x => x.SourcePath)
-                        .Select(e => $"{GetRelativePath(e.SourcePath)}: {e.Exception.Message}"),
+                        .Select(e =>
+                            $"{fileSystem.GetRelativePath(e.SourcePath)}: {e.Exception.Message}"
+                        ),
                     OutputLevel.Error
                 );
             }
@@ -207,7 +209,9 @@ public class IdentifyAndSortNewMediaProcessor(
         {
             var errors = identified
                 .ErroredFiles.OrderByPath(x => x.FilePath)
-                .Select(error => $"{GetRelativePath(error.FilePath)}: {error.Exception.Message}");
+                .Select(error =>
+                    $"{fileSystem.GetRelativePath(error.FilePath)}: {error.Exception.Message}"
+                );
             outputService.List("Errors:", errors, OutputLevel.Error);
             outputService.WriteLine("", OutputLevel.Error);
         }
@@ -227,7 +231,10 @@ public class IdentifyAndSortNewMediaProcessor(
                     string[] paths = [file.FilePath, .. file.RelatedFiles];
                     foreach (var path in paths.OrderByPath(p => p))
                     {
-                        outputService.WriteLine($"  {GetRelativePath(path)}", OutputLevel.Debug);
+                        outputService.WriteLine(
+                            $"  {fileSystem.GetRelativePath(path)}",
+                            OutputLevel.Debug
+                        );
                     }
                 }
                 outputService.WriteLine("", OutputLevel.Debug);
@@ -239,7 +246,10 @@ public class IdentifyAndSortNewMediaProcessor(
             outputService.Header("Missing metadata", OutputLevel.Debug);
             foreach (var file in identified.MediaFilesWithoutDates.OrderByPath(f => f.FilePath))
             {
-                outputService.WriteLine($"  {GetRelativePath(file.FilePath)}", OutputLevel.Debug);
+                outputService.WriteLine(
+                    $"  {fileSystem.GetRelativePath(file.FilePath)}",
+                    OutputLevel.Debug
+                );
             }
             outputService.WriteLine("", OutputLevel.Debug);
         }
@@ -249,7 +259,7 @@ public class IdentifyAndSortNewMediaProcessor(
             outputService.Header("Unsupported files", OutputLevel.Debug);
             foreach (var file in associated.RemainingIgnoredFiles.OrderByPath(p => p))
             {
-                outputService.WriteLine($"  {GetRelativePath(file)}", OutputLevel.Debug);
+                outputService.WriteLine($"  {fileSystem.GetRelativePath(file)}", OutputLevel.Debug);
             }
             outputService.WriteLine("", OutputLevel.Debug);
         }
@@ -279,10 +289,9 @@ public class IdentifyAndSortNewMediaProcessor(
                     var duplicateFile = duplicates[i];
                     try
                     {
-                        var fileInfo = new FileInfo(duplicateFile.SourcePath);
-                        if (fileInfo.Exists)
+                        if (fileSystem.FileExists(duplicateFile.SourcePath))
                         {
-                            fileInfo.Delete();
+                            fileSystem.DeleteFile(duplicateFile.SourcePath);
                             deletedFiles.Add(duplicateFile.SourcePath);
                         }
                     }
@@ -304,7 +313,7 @@ public class IdentifyAndSortNewMediaProcessor(
             outputService.Header("Deleted", OutputLevel.Debug);
             foreach (var file in deletedFiles.OrderBy(f => f))
             {
-                outputService.WriteLine($"  {GetRelativePath(file)}", OutputLevel.Debug);
+                outputService.WriteLine($"  {fileSystem.GetRelativePath(file)}", OutputLevel.Debug);
             }
             outputService.WriteLine("", OutputLevel.Debug);
         }
@@ -316,7 +325,7 @@ public class IdentifyAndSortNewMediaProcessor(
                 deletionErrors
                     .OrderByPath(x => x.FilePath)
                     .Select(error =>
-                        $"{GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
+                        $"{fileSystem.GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
                     ),
                 OutputLevel.Error
             );
@@ -332,7 +341,7 @@ public class IdentifyAndSortNewMediaProcessor(
             foreach (var m in result.Moved.OrderByPath(m => m.SourcePath))
             {
                 outputService.WriteLine(
-                    $"  {GetRelativePath(m.SourcePath)} -> {GetRelativePath(m.DestinationPath)}",
+                    $"  {fileSystem.GetRelativePath(m.SourcePath)} -> {fileSystem.GetRelativePath(m.DestinationPath)}",
                     OutputLevel.Debug
                 );
             }
@@ -345,19 +354,11 @@ public class IdentifyAndSortNewMediaProcessor(
             foreach (var d in result.Duplicates.OrderByPath(d => d.SourcePath))
             {
                 outputService.WriteLine(
-                    $"  {GetRelativePath(d.SourcePath)} == {GetRelativePath(d.DestinationPath)}",
+                    $"  {fileSystem.GetRelativePath(d.SourcePath)} == {fileSystem.GetRelativePath(d.DestinationPath)}",
                     OutputLevel.Debug
                 );
             }
             outputService.WriteLine("", OutputLevel.Debug);
         }
-    }
-
-    private string GetRelativePath(string? path)
-    {
-        if (path == null)
-            return string.Empty;
-
-        return Path.GetRelativePath(options.Value.Directory, path);
     }
 }
