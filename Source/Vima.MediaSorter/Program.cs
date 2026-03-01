@@ -1,13 +1,14 @@
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.CommandLine;
 using System.IO;
+using Microsoft.Extensions.DependencyInjection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Infrastructure.Hashers;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.Services.MediaFileHandlers;
+using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter;
 
@@ -46,7 +47,10 @@ public static class Program
     public static IServiceProvider ConfigureServices(string directoryPath)
     {
         var services = new ServiceCollection();
-        services.Configure<MediaSorterOptions>(options => { options.Directory = directoryPath; });
+        services.Configure<MediaSorterOptions>(options =>
+        {
+            options.Directory = directoryPath;
+        });
 
         services.AddTransient<IAppOrchestrator, AppOrchestrator>();
         services.AddTransient<IProcessor, IdentifyAndSortNewMediaProcessor>();
@@ -59,7 +63,9 @@ public static class Program
         services.AddTransient<IRelatedFilesDiscoveryService, RelatedFilesDiscoveryService>();
         services.AddTransient<IMediaSortingService, MediaSortingService>();
         services.AddTransient<ITimeZoneAdjustmentService, TimeZoneAdjustmentService>();
-        services.AddTransient<IAuditLogService, AuditLogService>();
+        services.AddSingleton<IOutputService, OutputService>();
+
+        services.AddSingleton<IConsole, DefaultConsole>();
 
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Cr3MediaFileHandler>();

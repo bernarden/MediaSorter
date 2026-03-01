@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using System.Threading;
 
@@ -15,20 +15,22 @@ public class ProgressBar : IDisposable, IProgress<double>
     private const string Animation = @"|/-\";
 
     private readonly Timer _timer;
+    private readonly IConsole _console;
 
     private double _currentProgress;
     private string _currentText = string.Empty;
     private bool _disposed;
     private int _animationIndex;
 
-    public ProgressBar()
+    public ProgressBar(IConsole console)
     {
+        _console = console;
         _timer = new(TimerHandler);
 
         // A progress bar is only for temporary display in a console window.
         // If the console output is redirected to a file, draw nothing.
         // Otherwise, we'll end up with a lot of garbage in the target file.
-        if (!Console.IsOutputRedirected)
+        if (!_console.IsOutputRedirected)
         {
             ResetTimer();
         }
@@ -45,14 +47,18 @@ public class ProgressBar : IDisposable, IProgress<double>
     {
         lock (_timer)
         {
-            if (_disposed) return;
+            if (_disposed)
+                return;
 
             int progressBlockCount = (int)(_currentProgress * BlockCount);
             int percent = (int)(_currentProgress * 100);
-            string text = string.Format("[{0}{1}] {2,3}% {3}",
-                new string('#', progressBlockCount), new string('-', BlockCount - progressBlockCount),
+            string text = string.Format(
+                "[{0}{1}] {2,3}% {3}",
+                new string('#', progressBlockCount),
+                new string('-', BlockCount - progressBlockCount),
                 percent,
-                Animation[_animationIndex++ % Animation.Length]);
+                Animation[_animationIndex++ % Animation.Length]
+            );
             UpdateText(text);
 
             ResetTimer();
@@ -64,7 +70,10 @@ public class ProgressBar : IDisposable, IProgress<double>
         // Get length of common portion
         int commonPrefixLength = 0;
         int commonLength = Math.Min(_currentText.Length, text.Length);
-        while (commonPrefixLength < commonLength && text[commonPrefixLength] == _currentText[commonPrefixLength])
+        while (
+            commonPrefixLength < commonLength
+            && text[commonPrefixLength] == _currentText[commonPrefixLength]
+        )
         {
             commonPrefixLength++;
         }
@@ -84,7 +93,7 @@ public class ProgressBar : IDisposable, IProgress<double>
             outputBuilder.Append('\b', overlapCount);
         }
 
-        Console.Write(outputBuilder);
+        _console.Write(outputBuilder.ToString());
         _currentText = text;
     }
 

@@ -10,40 +10,44 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Infrastructure.Hashers;
 using Vima.MediaSorter.Services;
-using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter.Processors;
 
 public class FindDuplicatesProcessor(
     IFileHasher fileHasher,
     IEnumerable<IVisualFileHasher> visualHashers,
-    IAuditLogService auditLogService,
+    IOutputService outputService,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
-    private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".bmp" };
+    private static readonly string[] ImageExtensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp"];
 
     public ProcessorOptions Option => ProcessorOptions.FindDuplicates;
 
     public void Process()
     {
-        string logPath = auditLogService.Initialise();
-
-        OutputConfiguration();
-
-        var (visualHasher, threshold) = SelectVisualHasher();
+        outputService.Start("Find duplicates");
 
         try
         {
-            Console.WriteLine("[Step 1/1] Duplicate Detection");
-            Console.WriteLine(ConsoleHelper.TaskSeparator);
+            OutputConfiguration();
+
+            var (visualHasher, threshold) = SelectVisualHasher();
+
+            outputService.Header("[Step 1/1] Duplicate Detection");
             Stopwatch sw = Stopwatch.StartNew();
 
-            List<string> allFiles = Directory
-                .EnumerateFiles(options.Value.Directory, "*", SearchOption.AllDirectories)
-                .ToList();
+            List<string> allFiles =
+            [
+                .. Directory.EnumerateFiles(
+                    options.Value.Directory,
+                    "*",
+                    SearchOption.AllDirectories
+                ),
+            ];
 
             var (visualHashes, binaryHashes, metadata, errors) = GenerateHashes(
                 visualHasher,
@@ -57,37 +61,130 @@ public class FindDuplicatesProcessor(
             );
 
             sw.Stop();
-            LogDuplicates(
+
+            var allDuplicates = exactDuplicates.Concat(visualDuplicates).ToList();
+            ReportAnalysisResults(
+                allFiles,
+                allDuplicates,
                 exactDuplicates,
                 visualDuplicates,
                 metadata,
                 errors,
                 visualHasher,
                 threshold,
-                allFiles.Count,
                 sw.Elapsed
             );
 
-            var allDuplicates = exactDuplicates.Concat(visualDuplicates).ToList();
-            DisplayFinalSummary(allFiles, allDuplicates, errors, logPath, sw.Elapsed);
-
             ReviewDuplicates(allDuplicates, metadata);
+
+            outputService.Complete();
         }
         catch (Exception ex)
         {
-            LogError("A critical error occurred.", ex);
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n[FATAL ERROR] {ex.Message}");
-            Console.WriteLine($"Details logged to: {logPath}");
-            Console.ResetColor();
+            outputService.Fatal("A critical error occurred.", ex);
         }
     }
 
     private void OutputConfiguration()
     {
-        Console.WriteLine($"Configuration:");
-        Console.WriteLine($"  Directory: {options.Value.Directory}");
-        Console.WriteLine();
+        outputService.Table(
+            "Configuration:",
+            [
+                new("Directory:", options.Value.Directory),
+                new("Log file:", outputService.LogFileName),
+                new("Binary hasher:", fileHasher.GetType().Name),
+            ]
+        );
+    }
+
+    private void ReportAnalysisResults(
+        List<string> allFiles,
+        List<List<string>> allDuplicates,
+        List<List<string>> exactDuplicates,
+        List<List<string>> visualDuplicates,
+        ConcurrentDictionary<string, (long size, int width, int height)> metadata,
+        ConcurrentBag<(string Path, Exception Ex)> errors,
+        IVisualFileHasher? visualHasher,
+        int threshold,
+        TimeSpan duration
+    )
+    {
+        int duplicateSets = allDuplicates.Count;
+        int redundantFiles = allDuplicates.Sum(d => d.Count) - duplicateSets;
+
+        outputService.Table(
+            "Analysis result:",
+            [
+                new("Total scanned:", allFiles.Count.ToString()),
+                new("Detection time:", duration.ToString(@"hh\:mm\:ss\.ff")),
+                new("Duplicate sets:", duplicateSets.ToString()),
+                new("Redundant files:", redundantFiles.ToString()),
+                new("Errors:", errors.Count.ToString(), !errors.IsEmpty),
+            ]
+        );
+
+        if (visualHasher != null)
+        {
+            outputService.Table(
+                "Visual detection configuration:",
+                [
+                    new("Hasher type:", visualHasher.Type.ToString()),
+                    new("Threshold:", threshold.ToString()),
+                ],
+                OutputLevel.Debug
+            );
+        }
+
+        LogDuplicateGroups("Exact duplicates (byte-for-byte)", exactDuplicates, metadata);
+
+        if (visualHasher != null)
+        {
+            LogDuplicateGroups(
+                $"Visual duplicates ({visualHasher.Type})",
+                visualDuplicates,
+                metadata
+            );
+        }
+
+        if (!errors.IsEmpty)
+        {
+            var errorDetails = errors
+                .OrderByPath(e => e.Path)
+                .Select(e => $"{GetRelativePath(e.Path)}: {e.Ex.Message}");
+            outputService.List("Errors:", errorDetails, OutputLevel.Error);
+            outputService.WriteLine("", OutputLevel.Error);
+        }
+    }
+
+    private void LogDuplicateGroups(
+        string title,
+        List<List<string>> groups,
+        ConcurrentDictionary<string, (long size, int width, int height)> metadata
+    )
+    {
+        if (groups.Count == 0)
+            return;
+
+        outputService.Header(title, OutputLevel.Debug);
+        foreach (var group in groups)
+        {
+            outputService.WriteLine($"Group set ({group.Count} files):", OutputLevel.Debug);
+            var fileDetails = group
+                .OrderByDescending(path => metadata[path].width * metadata[path].height)
+                .ThenByDescending(path => metadata[path].size)
+                .Select(path =>
+                {
+                    var (size, w, h) = metadata[path];
+                    string resolution = w > 0 ? $"{w}x{h}" : "N/A";
+                    return $"{GetRelativePath(path)} [{resolution} | {FormatFileSize(size)}]";
+                });
+
+            foreach (var detail in fileDetails)
+            {
+                outputService.WriteLine($"  {detail}", OutputLevel.Debug);
+            }
+            outputService.WriteLine("", OutputLevel.Debug);
+        }
     }
 
     private (
@@ -97,7 +194,7 @@ public class FindDuplicatesProcessor(
         ConcurrentBag<(string Path, Exception Ex)> errors
     ) GenerateHashes(IVisualFileHasher? visualHasher, List<string> allFiles)
     {
-        return ConsoleHelper.ExecuteWithProgress(
+        return outputService.ExecuteWithProgress(
             "Generating hashes",
             p =>
             {
@@ -118,7 +215,9 @@ public class FindDuplicatesProcessor(
                             if (visualHasher != null && ImageExtensions.Contains(ext))
                             {
                                 using var stream = File.OpenRead(path);
-                                using var bitmap = SKBitmap.Decode(stream);
+                                using var bitmap =
+                                    SKBitmap.Decode(stream)
+                                    ?? throw new Exception("Failed to decode the image.");
                                 metadata[path] = (info.Length, bitmap.Width, bitmap.Height);
                                 visualHashes[path] = visualHasher.GetHash(bitmap);
                             }
@@ -144,7 +243,7 @@ public class FindDuplicatesProcessor(
         );
     }
 
-    private static (
+    private (
         List<List<string>> binaryDuplicates,
         List<List<string>> visualDuplicates
     ) ClusterDuplicates(
@@ -153,7 +252,7 @@ public class FindDuplicatesProcessor(
         ConcurrentDictionary<string, string> binaryHashes
     )
     {
-        return ConsoleHelper.ExecuteWithProgress(
+        return outputService.ExecuteWithProgress(
             "Clustering duplicates",
             p =>
             {
@@ -208,153 +307,51 @@ public class FindDuplicatesProcessor(
 
     private (IVisualFileHasher? visualHasher, int threshold) SelectVisualHasher()
     {
-        Console.WriteLine("Duplicate Detection Modes:");
-        Console.WriteLine(
+        outputService.WriteLine("Duplicate detection modes:");
+        outputService.WriteLine(
             "  [0] Exact (default): Byte-for-byte match. Fastest; misses resized/edited images."
         );
-        Console.WriteLine(
+        outputService.WriteLine(
             $"  [{(int)VisualHasherType.Average}] Average: High speed. Best for near-identical copies."
         );
-        Console.WriteLine(
+        outputService.WriteLine(
             $"  [{(int)VisualHasherType.Difference}] Difference: Balanced. Great for finding resized/compressed versions."
         );
-        Console.WriteLine(
+        outputService.WriteLine(
             $"  [{(int)VisualHasherType.Perceptual}] Perceptual: High precision. Finds matches even if filtered/edited."
         );
-        Console.WriteLine(
+        outputService.WriteLine(
             $"Note: Visual modes only apply to: {string.Join(", ", ImageExtensions)}"
         );
-        Console.WriteLine();
-        var choice = ConsoleHelper.PromptForEnum<VisualHasherType>("Select mode", 0);
+        outputService.WriteLine();
+        var choice = outputService.PromptForEnum<VisualHasherType>("Select mode", 0);
         if ((int)choice == 0)
         {
-            Console.WriteLine();
+            outputService.WriteLine();
             return (null, 0);
         }
 
         var selectedHasher = visualHashers.FirstOrDefault(h => h.Type == choice);
         if (selectedHasher == null)
         {
-            Console.WriteLine($"(!) Hasher {choice} not registered. Defaulting to Exact.");
-            Console.WriteLine();
+            outputService.WriteLine(
+                $"  Hasher {choice} not registered. Defaulting to Exact.",
+                OutputLevel.Warn
+            );
+            outputService.WriteLine();
             return (null, 0);
         }
 
         int recommended = choice == VisualHasherType.Perceptual ? 8 : 2;
-        Console.Write($"Threshold 0-64 (match:0, default:{recommended}, loose:15): ");
-        if (!int.TryParse(Console.ReadLine(), out int threshold))
-        {
-            threshold = recommended;
-        }
+        int threshold = outputService.PromptForInt(
+            $"Threshold 0-64 (match:0, default:{recommended}, loose:15)",
+            recommended,
+            0,
+            64
+        );
 
-        Console.WriteLine();
+        outputService.WriteLine();
         return (selectedHasher, Math.Clamp(threshold, 0, 64));
-    }
-
-    private static void DisplayFinalSummary(
-        List<string> allFiles,
-        List<List<string>> duplicates,
-        ConcurrentBag<(string, Exception)> errors,
-        string log,
-        TimeSpan duration
-    )
-    {
-        int numberOfSetsWithDuplicaates = duplicates.Count;
-        int redundant = duplicates.Sum(d => d.Count) - numberOfSetsWithDuplicaates;
-
-        Console.WriteLine();
-        Console.WriteLine("Analysis Result:");
-        Console.WriteLine($"  Total scanned:   {allFiles.Count}");
-        Console.WriteLine($"  Detection time:  {duration:hh\\:mm\\:ss\\.ff}");
-        Console.WriteLine($"  Duplicate sets:  {numberOfSetsWithDuplicaates}");
-        Console.WriteLine($"  Redundant files: {redundant}");
-        if (!errors.IsEmpty)
-            Console.WriteLine($"  Errors:          {errors.Count} (see log)");
-        Console.WriteLine($"  Audit log:       {log}");
-
-        Console.WriteLine();
-    }
-
-    private void LogDuplicates(
-        List<List<string>> exactDuplicates,
-        List<List<string>> visualDuplicates,
-        ConcurrentDictionary<string, (long size, int width, int height)> metadata,
-        ConcurrentBag<(string Path, Exception Ex)> errors,
-        IVisualFileHasher? visualHasher,
-        int threshold,
-        int totalScanned,
-        TimeSpan duration
-    )
-    {
-        int duplicateSets = exactDuplicates.Count + visualDuplicates.Count;
-        int redundantFiles =
-            exactDuplicates.Sum(d => d.Count) + visualDuplicates.Sum(d => d.Count) - duplicateSets;
-
-        auditLogService.LogHeader("DUPLICATE DETECTION SUMMARY");
-        auditLogService.LogLine($"Directory:      {options.Value.Directory}");
-        auditLogService.LogLine($"Total Scanned:  {totalScanned}");
-        auditLogService.LogLine($"Execution Time: {duration:hh\\:mm\\:ss\\.ff}");
-        auditLogService.LogLine($"Duplicate Sets: {duplicateSets}");
-        auditLogService.LogLine($"Redundant:      {redundantFiles} files can be removed");
-        auditLogService.LogLine($"Errors:         {errors.Count}");
-
-        auditLogService.LogHeader("SCAN CONFIGURATION");
-        auditLogService.LogLine($"Binary Hasher:  {fileHasher.GetType().Name}");
-
-        if (visualHasher != null)
-        {
-            auditLogService.LogLine($"Visual Hasher:  {visualHasher.Type}");
-            auditLogService.LogLine($"Threshold:      {threshold} (Range 0-64)");
-        }
-
-        auditLogService.LogHeader("EXACT DUPLICATES (BYTE-FOR-BYTE)");
-        LogDuplicateGroups(exactDuplicates, metadata);
-
-        if (visualHasher != null)
-        {
-            auditLogService.LogHeader($"VISUAL DUPLICATES ({visualHasher.Type})");
-            LogDuplicateGroups(visualDuplicates, metadata);
-        }
-
-        if (!errors.IsEmpty)
-        {
-            auditLogService.LogHeader("TECHNICAL ERRORS DURING SCAN");
-            foreach (var error in errors)
-            {
-                auditLogService.LogLine($"FAIL: {error.Path} -> {error.Ex.Message}");
-            }
-        }
-
-        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator);
-        auditLogService.Flush();
-    }
-
-    private void LogDuplicateGroups(
-        List<List<string>> groups,
-        ConcurrentDictionary<string, (long size, int width, int height)> metadata
-    )
-    {
-        if (groups.Count == 0)
-        {
-            auditLogService.LogLine("No duplicates identified.");
-            return;
-        }
-
-        foreach (var group in groups)
-        {
-            auditLogService.LogLine($"\nGroup Set ({group.Count} files):");
-            var fileDetails = group
-                .OrderByDescending(path => metadata[path].width * metadata[path].height)
-                .ThenByDescending(path => metadata[path].size)
-                .Select(path =>
-                {
-                    var (size, w, h) = metadata[path];
-                    string resolution = w > 0 ? $"{w}x{h}" : "N/A";
-                    return $"{path} [{resolution} | {FormatFileSize(size)}]";
-                });
-
-            auditLogService.LogBulletPoints(fileDetails, 1);
-        }
     }
 
     private void ReviewDuplicates(
@@ -365,19 +362,21 @@ public class FindDuplicatesProcessor(
         if (groups.Count == 0)
             return;
 
-        var response = ConsoleHelper.AskYesNoQuestion(
-            "Would you like to interactively review duplicate groups one by one?",
-            ConsoleKey.N
-        );
-        if (response == ConsoleKey.N)
+        if (!outputService.Confirm("Action: Interactively review duplicate groups one by one?"))
+        {
+            outputService.WriteLine("  Operation aborted.");
+            outputService.WriteLine();
+            outputService.WriteLine(MediaSorterConstants.Separator);
+            outputService.WriteLine();
             return;
+        }
 
         string menuPrompt = "[V] View Files | [N] Next Group | [Q] Quit Review: ";
 
         for (int i = 0; i < groups.Count; i++)
         {
-            Console.WriteLine();
-            Console.WriteLine($"Group {i + 1}/{groups.Count} ({groups[i].Count} files)");
+            outputService.WriteLine();
+            outputService.WriteLine($"Group {i + 1}/{groups.Count} ({groups[i].Count} files)");
 
             var sortedGroup = groups[i]
                 .OrderByDescending(path => metadata[path].width * metadata[path].height)
@@ -388,29 +387,38 @@ public class FindDuplicatesProcessor(
                 var (size, w, h) = metadata[path];
                 string resolution = w > 0 ? $"{w}x{h}" : "N/A";
                 string relativePath = Path.GetRelativePath(options.Value.Directory, path);
-                Console.WriteLine($"  - {relativePath} [{resolution} | {FormatFileSize(size)}]");
+                outputService.WriteLine(
+                    $"  - {relativePath} [{resolution} | {FormatFileSize(size)}]"
+                );
             }
 
+            outputService.Flush();
+
             bool moveToNext = false;
-            Console.Write(menuPrompt);
+            outputService.Write(menuPrompt);
             while (!moveToNext)
             {
-                var input = Console.ReadKey(true).Key;
+                var input = outputService.ReadKey(true);
                 switch (input)
                 {
                     case ConsoleKey.V:
                         OpenGroupFiles(sortedGroup, menuPrompt);
                         break;
                     case ConsoleKey.N:
-                        Console.WriteLine();
+                        outputService.WriteLine(input.ToString());
                         moveToNext = true;
                         break;
                     case ConsoleKey.Q:
-                        Console.WriteLine();
+                        outputService.WriteLine(input.ToString());
+                        outputService.WriteLine();
+                        outputService.Flush();
                         return;
                 }
             }
+            outputService.Flush();
         }
+
+        outputService.WriteLine();
     }
 
     private void OpenGroupFiles(List<string> group, string prompt)
@@ -428,33 +436,37 @@ public class FindDuplicatesProcessor(
             catch (Exception ex)
             {
                 if (!errorOccurred)
-                    Console.WriteLine();
+                    outputService.WriteLine();
 
                 errorOccurred = true;
                 string relative = Path.GetRelativePath(options.Value.Directory, path);
-                Console.WriteLine($"(!) Failed to open {relative}: {ex.Message}");
+                outputService.WriteLine($"(!) Failed to open {relative}: {ex.Message}");
             }
         }
 
         if (errorOccurred)
-            Console.Write(prompt);
+        {
+            outputService.Write(prompt);
+            outputService.Flush();
+        }
     }
 
     private static string FormatFileSize(long bytes)
     {
-        string[] sufix = { "B", "KB", "MB", "GB", "TB" };
+        string[] suffix = ["B", "KB", "MB", "GB", "TB"];
         int i;
         double dblSByte = bytes;
-        for (i = 0; i < sufix.Length && bytes >= 1024; i++, bytes /= 1024)
+        for (i = 0; i < suffix.Length && bytes >= 1024; i++, bytes /= 1024)
             dblSByte = bytes / 1024.0;
 
-        return $"{dblSByte:0.##} {sufix[i]}";
+        return $"{dblSByte:0.##} {suffix[i]}";
     }
 
-    private void LogError(string message, Exception ex)
+    private string GetRelativePath(string? path)
     {
-        auditLogService.LogError(message, ex);
-        auditLogService.LogLine("\n" + ConsoleHelper.TaskSeparator + "\n");
-        auditLogService.Flush();
+        if (path == null)
+            return string.Empty;
+
+        return Path.GetRelativePath(options.Value.Directory, path);
     }
 }
