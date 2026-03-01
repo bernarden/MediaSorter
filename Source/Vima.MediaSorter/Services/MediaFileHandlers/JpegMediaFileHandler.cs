@@ -12,7 +12,7 @@ public class JpegMediaFileHandler() : BaseMediaFileHandler(".jpg", ".jpeg")
 {
     public override CreatedOn? GetCreatedOnDateFromMetadata(string filePath)
     {
-        using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
+        using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         var directories = JpegMetadataReader.ReadMetadata(fs, [new ExifReader()]);
         var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
         if (subIfdDirectory == null) return null;

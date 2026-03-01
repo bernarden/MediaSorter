@@ -21,7 +21,7 @@ public class Md5FileHasher() : IFileHasher
             path,
             FileMode.Open,
             FileAccess.Read,
-            FileShare.Read,
+            FileShare.ReadWrite,
             bufferSize: 65536
         );
         byte[] hashBytes = MD5.HashData(stream);
