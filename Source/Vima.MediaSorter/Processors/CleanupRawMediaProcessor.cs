@@ -106,17 +106,14 @@ public class CleanupRawMediaProcessor(
             outputService.Header("Proposed deletion plan", OutputLevel.Debug);
             foreach (var entry in plan.OrderBy(e => e.Key))
             {
-                outputService.WriteLine(
+                var files = entry
+                    .Value.OrderByPath(x => x)
+                    .Select(x => fileSystem.GetRelativePath(x, entry.Key));
+                outputService.List(
                     $"Folder: {fileSystem.GetRelativePath(entry.Key)}",
+                    files,
                     OutputLevel.Debug
                 );
-                foreach (var file in entry.Value.OrderByPath(x => x))
-                {
-                    outputService.WriteLine(
-                        $"  {fileSystem.GetRelativePath(file, entry.Key)}",
-                        OutputLevel.Debug
-                    );
-                }
                 outputService.WriteLine("", OutputLevel.Debug);
             }
         }

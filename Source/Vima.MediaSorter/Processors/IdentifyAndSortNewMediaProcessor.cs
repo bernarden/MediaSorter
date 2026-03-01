@@ -225,42 +225,30 @@ public class IdentifyAndSortNewMediaProcessor(
 
             foreach (var group in groups)
             {
-                outputService.WriteLine($"Folder: {group.Key}", OutputLevel.Debug);
-                foreach (var file in group.OrderByPath(f => f.FilePath))
-                {
-                    string[] paths = [file.FilePath, .. file.RelatedFiles];
-                    foreach (var path in paths.OrderByPath(p => p))
-                    {
-                        outputService.WriteLine(
-                            $"  {fileSystem.GetRelativePath(path)}",
-                            OutputLevel.Debug
-                        );
-                    }
-                }
+                var files = group
+                    .OrderByPath(f => f.FilePath)
+                    .SelectMany(file => (string[])[file.FilePath, .. file.RelatedFiles])
+                    .Select(path => fileSystem.GetRelativePath(path));
+                outputService.List($"Folder: {group.Key}", files, OutputLevel.Debug);
                 outputService.WriteLine("", OutputLevel.Debug);
             }
         }
 
         if (identified.MediaFilesWithoutDates.Any())
         {
-            outputService.Header("Missing metadata", OutputLevel.Debug);
-            foreach (var file in identified.MediaFilesWithoutDates.OrderByPath(f => f.FilePath))
-            {
-                outputService.WriteLine(
-                    $"  {fileSystem.GetRelativePath(file.FilePath)}",
-                    OutputLevel.Debug
-                );
-            }
+            var files = identified
+                .MediaFilesWithoutDates.OrderByPath(f => f.FilePath)
+                .Select(f => fileSystem.GetRelativePath(f.FilePath));
+            outputService.List("Missing metadata", files, OutputLevel.Debug);
             outputService.WriteLine("", OutputLevel.Debug);
         }
 
         if (associated.RemainingIgnoredFiles.Any())
         {
-            outputService.Header("Unsupported files", OutputLevel.Debug);
-            foreach (var file in associated.RemainingIgnoredFiles.OrderByPath(p => p))
-            {
-                outputService.WriteLine($"  {fileSystem.GetRelativePath(file)}", OutputLevel.Debug);
-            }
+            var files = associated
+                .RemainingIgnoredFiles.OrderByPath(p => p)
+                .Select(p => fileSystem.GetRelativePath(p));
+            outputService.List("Unsupported files", files, OutputLevel.Debug);
             outputService.WriteLine("", OutputLevel.Debug);
         }
     }
@@ -310,11 +298,8 @@ public class IdentifyAndSortNewMediaProcessor(
 
         if (deletedFiles.Count != 0)
         {
-            outputService.Header("Deleted", OutputLevel.Debug);
-            foreach (var file in deletedFiles.OrderBy(f => f))
-            {
-                outputService.WriteLine($"  {fileSystem.GetRelativePath(file)}", OutputLevel.Debug);
-            }
+            var files = deletedFiles.OrderBy(f => f).Select(f => fileSystem.GetRelativePath(f));
+            outputService.List("Deleted", files, OutputLevel.Debug);
             outputService.WriteLine("", OutputLevel.Debug);
         }
 
@@ -337,27 +322,23 @@ public class IdentifyAndSortNewMediaProcessor(
     {
         if (result.Moved.Any())
         {
-            outputService.Header("Successfully moved", OutputLevel.Debug);
-            foreach (var m in result.Moved.OrderByPath(m => m.SourcePath))
-            {
-                outputService.WriteLine(
-                    $"  {fileSystem.GetRelativePath(m.SourcePath)} -> {fileSystem.GetRelativePath(m.DestinationPath)}",
-                    OutputLevel.Debug
+            var items = result
+                .Moved.OrderByPath(m => m.SourcePath)
+                .Select(m =>
+                    $"{fileSystem.GetRelativePath(m.SourcePath)} -> {fileSystem.GetRelativePath(m.DestinationPath)}"
                 );
-            }
+            outputService.List("Successfully moved", items, OutputLevel.Debug);
             outputService.WriteLine("", OutputLevel.Debug);
         }
 
         if (result.Duplicates.Any())
         {
-            outputService.Header("Duplicates detected", OutputLevel.Debug);
-            foreach (var d in result.Duplicates.OrderByPath(d => d.SourcePath))
-            {
-                outputService.WriteLine(
-                    $"  {fileSystem.GetRelativePath(d.SourcePath)} == {fileSystem.GetRelativePath(d.DestinationPath)}",
-                    OutputLevel.Debug
+            var items = result
+                .Duplicates.OrderByPath(d => d.SourcePath)
+                .Select(d =>
+                    $"{fileSystem.GetRelativePath(d.SourcePath)} == {fileSystem.GetRelativePath(d.DestinationPath)}"
                 );
-            }
+            outputService.List("Duplicates detected", items, OutputLevel.Debug);
             outputService.WriteLine("", OutputLevel.Debug);
         }
     }

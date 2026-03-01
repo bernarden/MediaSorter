@@ -164,17 +164,16 @@ public class RenameSortedMediaProcessor(
                 .OrderBy(g => g.Key);
             foreach (var folderGroup in folderGroups)
             {
-                outputService.WriteLine(
+                var files = folderGroup
+                    .OrderBy(p => p.Source)
+                    .Select(p =>
+                        $"{Path.GetFileName(p.Source)} -> {Path.GetFileName(p.Destination)}"
+                    );
+                outputService.List(
                     $"Folder: {fileSystem.GetRelativePath(folderGroup.Key)}",
+                    files,
                     OutputLevel.Debug
                 );
-                foreach (var (Source, Destination) in folderGroup.OrderBy(p => p.Source))
-                {
-                    outputService.WriteLine(
-                        $"  {Path.GetFileName(Source)} -> {Path.GetFileName(Destination)}",
-                        OutputLevel.Debug
-                    );
-                }
                 outputService.WriteLine("", OutputLevel.Debug);
             }
         }
