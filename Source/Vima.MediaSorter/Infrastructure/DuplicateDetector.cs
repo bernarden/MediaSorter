@@ -20,14 +20,14 @@ public class DuplicateDetector : IDuplicateDetector
             path1,
             FileMode.Open,
             FileAccess.Read,
-            FileShare.Read,
+            FileShare.ReadWrite,
             bufferSize: 65536
         );
         using var s2 = new FileStream(
             path2,
             FileMode.Open,
             FileAccess.Read,
-            FileShare.Read,
+            FileShare.ReadWrite,
             bufferSize: 65536
         );
 

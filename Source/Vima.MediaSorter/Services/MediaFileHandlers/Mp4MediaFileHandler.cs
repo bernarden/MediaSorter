@@ -11,7 +11,7 @@ public class Mp4MediaFileHandler() : BaseMediaFileHandler(".mp4")
 {
     public override CreatedOn? GetCreatedOnDateFromMetadata(string filePath)
     {
-        using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
+        using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         var directories = QuickTimeMetadataReader.ReadMetadata(fs);
         var subIfdDirectory = directories.OfType<QuickTimeMovieHeaderDirectory>().FirstOrDefault();
         if (subIfdDirectory == null) return null;
