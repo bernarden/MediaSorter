@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
@@ -11,21 +11,26 @@ public interface IFileMover
     FileMove Move(string sourceFilePath, string targetDirectory, string targetFileName);
 }
 
-public class FileMover(IDuplicateDetector duplicateDetector) : IFileMover
+public class FileMover(IFileSystem fileSystem, IDuplicateDetector duplicateDetector) : IFileMover
 {
     private readonly ConcurrentDictionary<string, bool> _previouslyCreatedFolders = new();
 
-    public FileMove Move(
-        string sourceFilePath, string targetDirectory, string targetFileName)
+    public FileMove Move(string sourceFilePath, string targetDirectory, string targetFileName)
     {
-        _previouslyCreatedFolders.GetOrAdd(targetDirectory, path =>
-        {
-            Directory.CreateDirectory(path);
-            return true;
-        });
+        _previouslyCreatedFolders.GetOrAdd(
+            targetDirectory,
+            path =>
+            {
+                if (!fileSystem.DirectoryExists(path))
+                {
+                    fileSystem.CreateDirectory(path);
+                }
+                return true;
+            }
+        );
 
         string targetPath = Path.Combine(targetDirectory, targetFileName);
-        if (!File.Exists(targetPath))
+        if (!fileSystem.FileExists(targetPath))
             return ExecuteMoveWithRetries(sourceFilePath, targetPath);
 
         if (duplicateDetector.AreIdentical(sourceFilePath, targetPath))
@@ -35,14 +40,14 @@ public class FileMover(IDuplicateDetector duplicateDetector) : IFileMover
         return ExecuteMoveWithRetries(sourceFilePath, uniqueTargetPath);
     }
 
-    private static FileMove ExecuteMoveWithRetries(string source, string dest)
+    private FileMove ExecuteMoveWithRetries(string source, string dest)
     {
         const int maxAttempts = 3;
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
             {
-                File.Move(source, dest);
+                fileSystem.Move(source, dest);
                 return new SuccessfulFileMove(source, dest);
             }
             catch (Exception ex) when (IsTransient(ex) && attempt < maxAttempts)
@@ -51,18 +56,19 @@ public class FileMover(IDuplicateDetector duplicateDetector) : IFileMover
             }
         }
 
-        File.Move(source, dest);
+        fileSystem.Move(source, dest);
         return new SuccessfulFileMove(source, dest);
     }
 
-    private static bool IsTransient(Exception ex) => ex switch
-    {
-        IOException => true,
-        UnauthorizedAccessException => true,
-        _ => false
-    };
+    private static bool IsTransient(Exception ex) =>
+        ex switch
+        {
+            IOException => true,
+            UnauthorizedAccessException => true,
+            _ => false,
+        };
 
-    private static string GenerateUniqueTargetPath(string targetDirectory, string targetFileName)
+    private string GenerateUniqueTargetPath(string targetDirectory, string targetFileName)
     {
         string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(targetFileName);
         string extension = Path.GetExtension(targetFileName).ToLowerInvariant();
@@ -71,9 +77,12 @@ public class FileMover(IDuplicateDetector duplicateDetector) : IFileMover
         string uniqueTargetPath;
         do
         {
-            uniqueTargetPath = Path.Combine(targetDirectory, $"{fileNameWithoutExtension} ({count}){extension}");
+            uniqueTargetPath = Path.Combine(
+                targetDirectory,
+                $"{fileNameWithoutExtension} ({count}){extension}"
+            );
             count++;
-        } while (File.Exists(uniqueTargetPath));
+        } while (fileSystem.FileExists(uniqueTargetPath));
 
         return uniqueTargetPath;
     }

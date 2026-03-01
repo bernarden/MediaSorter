@@ -9,21 +9,14 @@ public interface IFileHasher
     string GetHash(string path);
 }
 
-public class Md5FileHasher() : IFileHasher
+public class Md5FileHasher(IFileSystem fileSystem) : IFileHasher
 {
     public string GetHash(string path)
     {
-        var file = new FileInfo(path);
-        if (!file.Exists)
+        if (!fileSystem.FileExists(path))
             return string.Empty;
 
-        using var stream = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite,
-            bufferSize: 65536
-        );
+        using var stream = fileSystem.CreateFileStream(path, FileMode.Open, FileAccess.Read);
         byte[] hashBytes = MD5.HashData(stream);
         return Convert.ToHexString(hashBytes);
     }

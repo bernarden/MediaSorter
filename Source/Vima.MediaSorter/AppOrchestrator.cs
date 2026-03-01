@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Services;
@@ -103,10 +103,16 @@ public class AppOrchestrator(
     private ProcessorOptions GetProcessorOption()
     {
         outputService.WriteLine("Available actions:");
-        outputService.WriteLine($"  [{(int)ProcessorOptions.IdentifyAndSortNewMedia}] Identify and sort new media");
+        outputService.WriteLine(
+            $"  [{(int)ProcessorOptions.IdentifyAndSortNewMedia}] Identify and sort new media"
+        );
         outputService.WriteLine($"  [{(int)ProcessorOptions.FindDuplicates}] Find duplicates");
-        outputService.WriteLine($"  [{(int)ProcessorOptions.RenameSortedMedia}] Rename media in sorted folders");
-        outputService.WriteLine($"  [{(int)ProcessorOptions.CleanupRawMedia}] Cleanup orphaned RAW files");
+        outputService.WriteLine(
+            $"  [{(int)ProcessorOptions.RenameSortedMedia}] Rename media in sorted folders"
+        );
+        outputService.WriteLine(
+            $"  [{(int)ProcessorOptions.CleanupRawMedia}] Cleanup orphaned RAW files"
+        );
         outputService.WriteLine($"  [{(int)ProcessorOptions.Exit}] Exit (default)");
         outputService.WriteLine();
 

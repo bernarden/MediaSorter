@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Services;
@@ -11,6 +11,7 @@ namespace Vima.MediaSorter.Processors;
 
 public class CleanupRawMediaProcessor(
     IDirectoryIdentificationService directoryIdentificationService,
+    IFileSystem fileSystem,
     IOutputService outputService,
     IOptions<MediaSorterOptions> options
 ) : IProcessor
@@ -105,11 +106,14 @@ public class CleanupRawMediaProcessor(
             outputService.Header("Proposed deletion plan", OutputLevel.Debug);
             foreach (var entry in plan.OrderBy(e => e.Key))
             {
-                outputService.WriteLine($"Folder: {GetRelativePath(entry.Key)}", OutputLevel.Debug);
+                outputService.WriteLine(
+                    $"Folder: {fileSystem.GetRelativePath(entry.Key)}",
+                    OutputLevel.Debug
+                );
                 foreach (var file in entry.Value.OrderByPath(x => x))
                 {
                     outputService.WriteLine(
-                        $"  {Path.GetRelativePath(entry.Key, file)}",
+                        $"  {fileSystem.GetRelativePath(file, entry.Key)}",
                         OutputLevel.Debug
                     );
                 }
@@ -126,16 +130,16 @@ public class CleanupRawMediaProcessor(
         {
             var rawFolderPath = Path.Combine(mainFolder, MediaSorterConstants.RawFolderName);
 
-            if (!Directory.Exists(rawFolderPath))
+            if (!fileSystem.DirectoryExists(rawFolderPath))
                 continue;
 
-            var curatedBaseNames = Directory
-                .GetFiles(mainFolder)
+            var curatedBaseNames = fileSystem
+                .EnumerateFiles(mainFolder)
                 .Select(Path.GetFileNameWithoutExtension)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var orphanedRaws = Directory
-                .GetFiles(rawFolderPath)
+            var orphanedRaws = fileSystem
+                .EnumerateFiles(rawFolderPath)
                 .Where(f => rawExtensions.Contains(Path.GetExtension(f)))
                 .Where(f => !curatedBaseNames.Contains(Path.GetFileNameWithoutExtension(f)))
                 .ToList();
@@ -166,7 +170,7 @@ public class CleanupRawMediaProcessor(
                     {
                         try
                         {
-                            File.Delete(filePath);
+                            fileSystem.DeleteFile(filePath);
                             deleteDetails.Add(filePath);
                             deleted++;
                         }
@@ -185,36 +189,28 @@ public class CleanupRawMediaProcessor(
         outputService.WriteLine($"  Result: Deleted {deleted} file(s).");
         outputService.WriteLine();
 
-        if (errors > 0)
+        if (deleteDetails.Count > 0)
         {
             outputService.List(
                 "Deleted",
-                deleteDetails.OrderByPath(x => x).Select(x => GetRelativePath(x)),
+                deleteDetails.OrderByPath(x => x).Select(x => fileSystem.GetRelativePath(x)),
                 OutputLevel.Debug
             );
             outputService.WriteLine("", OutputLevel.Debug);
         }
 
-        if (errors > 0)
+        if (deletionErrors.Count > 0)
         {
             outputService.List(
                 "Deletion failures:",
                 deletionErrors
                     .OrderByPath(x => x.FilePath)
                     .Select(error =>
-                        $"{GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
+                        $"{fileSystem.GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
                     ),
                 OutputLevel.Error
             );
             outputService.WriteLine("", OutputLevel.Error);
         }
-    }
-
-    private string GetRelativePath(string? path)
-    {
-        if (path == null)
-            return string.Empty;
-
-        return Path.GetRelativePath(options.Value.Directory, path);
     }
 }

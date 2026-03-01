@@ -1,2 +1,5 @@
 ﻿[*.{cs,vb}]
 dotnet_diagnostic.IDE0028.severity = none
+
+[*.cs]
+dotnet_sort_system_directives_first = true

@@ -3,7 +3,7 @@ using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Infrastructure.Hashers;
 
-public class DifferenceVisualFileHasher : VisualFileHasherBase
+public class DifferenceVisualFileHasher(IFileSystem fileSystem) : VisualFileHasherBase(fileSystem)
 {
     public override VisualHasherType Type => VisualHasherType.Difference;
 

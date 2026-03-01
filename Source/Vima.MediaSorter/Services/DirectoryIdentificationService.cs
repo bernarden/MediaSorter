@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
 
