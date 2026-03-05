@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
@@ -108,20 +109,22 @@ public class IdentifyAndSortNewMediaProcessor(
                 outputService.WriteLine();
             }
 
-            if (sortingResult.Errors.Count > 0)
-            {
-                IEnumerable<string> sortingErrors = sortingResult
-                    .Errors.OrderByPath(x => x.SourcePath)
-                    .Select(e =>
-                        $"{fileSystem.GetRelativePath(e.SourcePath)}: {e.Exception.Message}"
-                    );
-                outputService.List("Sorting Errors:", sortingErrors, OutputLevel.Error, 5);
-                outputService.WriteLine(string.Empty, OutputLevel.Error);
-            }
-
             LogSorting(sortingResult);
 
             HandleDuplicates(sortingResult.Duplicates);
+
+            List<string> affectedFolders = sortingResult
+                .Moved.Select(m => Path.GetDirectoryName(m.SourcePath))
+                .Concat(sortingResult.Duplicates.Select(d => Path.GetDirectoryName(d.SourcePath)))
+                .Where(path => path != null && !string.IsNullOrEmpty(path))
+                .Cast<string>()
+                .Distinct()
+                .ToList();
+
+            if (affectedFolders.Count != 0)
+            {
+                CleanUpEmptyFolders(affectedFolders);
+            }
 
             outputService.Complete();
         }
@@ -294,7 +297,8 @@ public class IdentifyAndSortNewMediaProcessor(
         if (deletedFiles.Count != 0)
         {
             var files = deletedFiles.OrderBy(f => f).Select(f => fileSystem.GetRelativePath(f));
-            outputService.List("Deleted:", files, OutputLevel.Debug);
+            outputService.Subsection("Deleted", OutputLevel.Debug);
+            outputService.List(string.Empty, files, OutputLevel.Debug);
             outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
 
@@ -310,8 +314,147 @@ public class IdentifyAndSortNewMediaProcessor(
         }
     }
 
+    private void CleanUpEmptyFolders(IEnumerable<string> affectedFolders)
+    {
+        string rootDir =
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.Value.Directory))
+            + Path.DirectorySeparatorChar;
+
+        var processingQueue = new PriorityQueue<string, int>();
+
+        foreach (var path in affectedFolders)
+        {
+            string fullPath = Path.GetFullPath(path);
+            if (
+                fullPath.StartsWith(rootDir, StringComparison.OrdinalIgnoreCase)
+                && fullPath.Length > rootDir.Length
+            )
+            {
+                processingQueue.Enqueue(fullPath, -fullPath.Length);
+            }
+        }
+
+        if (processingQueue.Count == 0)
+            return;
+
+        var foldersToDelete = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (processingQueue.TryDequeue(out var current, out _))
+        {
+            if (!fileSystem.DirectoryExists(current))
+                continue;
+
+            bool hasFiles = fileSystem
+                .EnumerateFiles(current, "*", SearchOption.TopDirectoryOnly)
+                .Any();
+            if (hasFiles)
+                continue;
+
+            bool hasRemainingSubDirs = fileSystem
+                .EnumerateDirectories(current, "*", SearchOption.TopDirectoryOnly)
+                .Any(sub => !foldersToDelete.Contains(sub));
+
+            if (!hasRemainingSubDirs)
+            {
+                foldersToDelete.Add(current);
+
+                string? parent = Path.GetDirectoryName(current);
+                if (
+                    parent != null
+                    && parent.StartsWith(rootDir, StringComparison.OrdinalIgnoreCase)
+                    && parent.Length >= rootDir.Length
+                    && seen.Add(parent)
+                )
+                {
+                    processingQueue.Enqueue(parent, -parent.Length);
+                }
+            }
+        }
+
+        if (foldersToDelete.Count == 0)
+            return;
+
+        var foldersToDeleteList = foldersToDelete.OrderByDescending(f => f.Length).ToList();
+
+        outputService.Subsection("Planned deletions", OutputLevel.Debug);
+        outputService.List(
+            string.Empty,
+            foldersToDeleteList.Select(f => fileSystem.GetRelativePath(f)),
+            OutputLevel.Debug
+        );
+        outputService.WriteLine(string.Empty, OutputLevel.Debug);
+
+        if (!outputService.Confirm($"Action: Delete {foldersToDeleteList.Count} empty folder(s)?"))
+        {
+            outputService.WriteLine("  Folder cleanup aborted.");
+            return;
+        }
+
+        var deletedFolders = new List<string>();
+        var deletionErrors = new List<(string Path, string ExceptionMessage)>();
+
+        outputService.ExecuteWithProgress(
+            "  Deleting folders",
+            p =>
+            {
+                for (int i = 0; i < foldersToDeleteList.Count; i++)
+                {
+                    var folder = foldersToDeleteList[i];
+                    try
+                    {
+                        if (fileSystem.DirectoryExists(folder))
+                        {
+                            fileSystem.DeleteDirectory(folder);
+                            deletedFolders.Add(folder);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        deletionErrors.Add((folder, ex.Message));
+                    }
+                    p.Report((double)(i + 1) / foldersToDeleteList.Count);
+                }
+                return true;
+            }
+        );
+
+        outputService.WriteLine($"  Result: Deleted {deletedFolders.Count} folder(s).");
+        outputService.WriteLine();
+
+        if (deletedFolders.Count > 0)
+        {
+            var items = deletedFolders
+                .OrderByPath(f => f)
+                .Select(f => fileSystem.GetRelativePath(f));
+            outputService.Subsection("Deleted", OutputLevel.Debug);
+            outputService.List(string.Empty, items, OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
+        }
+
+        if (deletionErrors.Count > 0)
+        {
+            var errors = deletionErrors
+                .OrderByPath(e => e.Path)
+                .Select(e => $"{fileSystem.GetRelativePath(e.Path)}: {e.ExceptionMessage}");
+            outputService.List("Deletion failures:", errors, OutputLevel.Error, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Error);
+        }
+    }
+
     private void LogSorting(SortedMedia result)
     {
+        if (result.Errors.Count > 0)
+        {
+            IEnumerable<string> sortingErrors = result
+                .Errors.OrderByPath(x => x.SourcePath)
+                .Select(e =>
+                    $"{fileSystem.GetRelativePath(e.SourcePath)}: {e.Exception.Message}"
+                );
+            outputService.List("Sorting Errors:", sortingErrors, OutputLevel.Error, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Error);
+        }
+
         if (result.Moved.Any())
         {
             var items = result

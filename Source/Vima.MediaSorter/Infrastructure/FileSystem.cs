@@ -12,11 +12,18 @@ public interface IFileSystem
         string searchPattern = "*",
         SearchOption searchOption = SearchOption.TopDirectoryOnly
     );
+
+    IEnumerable<string> EnumerateDirectories(
+        string path,
+        string searchPattern = "*",
+        SearchOption searchOption = SearchOption.TopDirectoryOnly
+    );
+
     bool FileExists(string path);
     bool DirectoryExists(string path);
     void CreateDirectory(string path);
     void DeleteFile(string path);
-    void DeleteDirectory(string path, bool recursive = true);
+    void DeleteDirectory(string path, bool recursive = false);
     void Move(string source, string destination);
     FileStream CreateFileStream(
         string path,
@@ -43,6 +50,15 @@ public class FileSystem(IOptions<MediaSorterOptions> options) : IFileSystem
         return Directory.EnumerateFiles(path, searchPattern, searchOption);
     }
 
+    public IEnumerable<string> EnumerateDirectories(
+        string path,
+        string searchPattern = "*",
+        SearchOption searchOption = SearchOption.TopDirectoryOnly
+    )
+    {
+        return Directory.EnumerateDirectories(path, searchPattern, searchOption);
+    }
+
     public bool FileExists(string path)
     {
         return File.Exists(path);
@@ -63,7 +79,7 @@ public class FileSystem(IOptions<MediaSorterOptions> options) : IFileSystem
         File.Delete(path);
     }
 
-    public void DeleteDirectory(string path, bool recursive = true)
+    public void DeleteDirectory(string path, bool recursive = false)
     {
         Directory.Delete(path, recursive);
     }
