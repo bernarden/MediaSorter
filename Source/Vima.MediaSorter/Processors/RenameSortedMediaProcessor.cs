@@ -31,7 +31,7 @@ public class RenameSortedMediaProcessor(
         {
             OutputConfiguration();
 
-            outputService.Header("[Step 1/2] Identification");
+            outputService.Section("[Step 1/2] Identification");
 
             var directoryStructure = outputService.ExecuteWithProgress(
                 "Identifying directories",
@@ -71,23 +71,17 @@ public class RenameSortedMediaProcessor(
                 timeZoneAdjustedFilePaths.Count
             );
 
-            outputService.Header("[Step 2/2] Renaming");
+            outputService.Section("[Step 2/2] Renaming");
 
             if (renamePlan.Count == 0)
             {
-                outputService.WriteLine("  All files already match the naming convention.");
-                outputService.WriteLine();
-                outputService.WriteLine(MediaSorterConstants.Separator);
-                outputService.WriteLine();
+                outputService.Complete("  All files already match the naming convention.");
                 return;
             }
 
             if (!outputService.Confirm($"Action: Rename {renamePlan.Count} file(s)?"))
             {
-                outputService.WriteLine("  Operation aborted.");
-                outputService.WriteLine();
-                outputService.WriteLine(MediaSorterConstants.Separator);
-                outputService.WriteLine();
+                outputService.Complete("  Operation aborted.");
                 return;
             }
 
@@ -153,13 +147,13 @@ public class RenameSortedMediaProcessor(
             var errors = identified
                 .ErroredFiles.OrderBy(e => e.FilePath)
                 .Select(e => $"{fileSystem.GetRelativePath(e.FilePath)}: {e.Exception.Message}");
-            outputService.List("Errors:", errors, OutputLevel.Error);
-            outputService.WriteLine("", OutputLevel.Error);
+            outputService.List("Errors:", errors, OutputLevel.Error, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Error);
         }
 
         if (plan.Count != 0)
         {
-            outputService.Header("Proposed rename plan", OutputLevel.Debug);
+            outputService.Subsection("Proposed rename plan", OutputLevel.Debug);
             var folderGroups = plan.GroupBy(p => Path.GetDirectoryName(p.Source))
                 .OrderBy(g => g.Key);
             foreach (var folderGroup in folderGroups)
@@ -170,11 +164,11 @@ public class RenameSortedMediaProcessor(
                         $"{Path.GetFileName(p.Source)} -> {Path.GetFileName(p.Destination)}"
                     );
                 outputService.List(
-                    $"Folder: {fileSystem.GetRelativePath(folderGroup.Key)}",
+                    $"Folder {fileSystem.GetRelativePath(folderGroup.Key)}:",
                     files,
                     OutputLevel.Debug
                 );
-                outputService.WriteLine("", OutputLevel.Debug);
+                outputService.WriteLine(string.Empty, OutputLevel.Debug);
             }
         }
     }
@@ -281,28 +275,21 @@ public class RenameSortedMediaProcessor(
 
         if (moved.Count > 0)
         {
-            outputService.List(
-                "Successfully renamed:",
-                moved
-                    .OrderByPath(m => m.Source)
-                    .Select(m =>
-                        $"  {Path.GetFileName(m.Source)} -> {Path.GetFileName(m.Destination)}"
-                    ),
-                OutputLevel.Debug
-            );
-            outputService.WriteLine("", OutputLevel.Debug);
+            var renamed = moved
+                .OrderByPath(m => m.Source)
+                .Select(m => $"{Path.GetFileName(m.Source)} -> {Path.GetFileName(m.Destination)}");
+            outputService.Subsection("Successfully renamed", OutputLevel.Debug);
+            outputService.List(string.Empty, renamed, OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
 
         if (errors.Count > 0)
         {
-            outputService.List(
-                "Failed to rename:",
-                errors
-                    .OrderByPath(m => m.Source)
-                    .Select(e => $"{Path.GetFileName(e.Source)}: {e.Exception.Message}"),
-                OutputLevel.Error
-            );
-            outputService.WriteLine("", OutputLevel.Error);
+            var failedToRename = errors
+                .OrderByPath(m => m.Source)
+                .Select(e => $"{Path.GetFileName(e.Source)}: {e.Exception.Message}");
+            outputService.List("Failed to rename:", failedToRename, OutputLevel.Error, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Error);
         }
     }
 

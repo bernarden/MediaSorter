@@ -28,7 +28,7 @@ public class CleanupRawMediaProcessor(
         {
             OutputConfiguration();
 
-            outputService.Header("[Step 1/2] Identification");
+            outputService.Section("[Step 1/2] Identification");
 
             var structure = outputService.ExecuteWithProgress(
                 "Scanning directories",
@@ -39,17 +39,12 @@ public class CleanupRawMediaProcessor(
 
             ReportAnalysisResults(structure, deletionPlan);
 
-            outputService.Header("[Step 2/2] Deletion");
+            outputService.Section("[Step 2/2] Deletion");
 
             int totalOrphanedCount = deletionPlan.Sum(p => p.Value.Count);
             if (totalOrphanedCount == 0)
             {
-                outputService.WriteLine(
-                    "  Everything is in sync. No RAW files need to be deleted."
-                );
-                outputService.WriteLine();
-                outputService.WriteLine(MediaSorterConstants.Separator);
-                outputService.WriteLine();
+                outputService.Complete("  Everything is in sync. No RAW files need to be deleted.");
                 return;
             }
 
@@ -57,10 +52,7 @@ public class CleanupRawMediaProcessor(
                 !outputService.Confirm($"Action: Delete {totalOrphanedCount} orphaned RAW file(s)?")
             )
             {
-                outputService.WriteLine("  Operation aborted.");
-                outputService.WriteLine();
-                outputService.WriteLine(MediaSorterConstants.Separator);
-                outputService.WriteLine();
+                outputService.Complete("  Operation aborted.");
                 return;
             }
 
@@ -103,18 +95,18 @@ public class CleanupRawMediaProcessor(
 
         if (plan.Count != 0)
         {
-            outputService.Header("Proposed deletion plan", OutputLevel.Debug);
+            outputService.Subsection("Proposed deletion plan", OutputLevel.Debug);
             foreach (var entry in plan.OrderBy(e => e.Key))
             {
                 var files = entry
                     .Value.OrderByPath(x => x)
                     .Select(x => fileSystem.GetRelativePath(x, entry.Key));
                 outputService.List(
-                    $"Folder: {fileSystem.GetRelativePath(entry.Key)}",
+                    $"Folder {fileSystem.GetRelativePath(entry.Key)}:",
                     files,
                     OutputLevel.Debug
                 );
-                outputService.WriteLine("", OutputLevel.Debug);
+                outputService.WriteLine(string.Empty, OutputLevel.Debug);
             }
         }
     }
@@ -188,26 +180,24 @@ public class CleanupRawMediaProcessor(
 
         if (deleteDetails.Count > 0)
         {
+            outputService.Subsection("Deleted", OutputLevel.Debug);
             outputService.List(
-                "Deleted",
+                string.Empty,
                 deleteDetails.OrderByPath(x => x).Select(x => fileSystem.GetRelativePath(x)),
                 OutputLevel.Debug
             );
-            outputService.WriteLine("", OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
 
         if (deletionErrors.Count > 0)
         {
-            outputService.List(
-                "Deletion failures:",
-                deletionErrors
-                    .OrderByPath(x => x.FilePath)
-                    .Select(error =>
-                        $"{fileSystem.GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
-                    ),
-                OutputLevel.Error
-            );
-            outputService.WriteLine("", OutputLevel.Error);
+            var errorsOutput = deletionErrors
+                .OrderByPath(x => x.FilePath)
+                .Select(error =>
+                    $"{fileSystem.GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
+                );
+            outputService.List("Deletion failures:", errorsOutput, OutputLevel.Error, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Error);
         }
     }
 }

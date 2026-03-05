@@ -57,9 +57,9 @@ public class AppOrchestrator(
         catch (Exception ex)
         {
             outputService.WriteLine();
-            outputService.WriteLine(MediaSorterConstants.Separator);
-            outputService.WriteLine($"A critical error occurred: {ex.Message}");
-            outputService.WriteLine(MediaSorterConstants.Separator);
+            outputService.Section("A critical error occurred");
+            outputService.WriteLine(ex.Message);
+            outputService.WriteLine(ex.StackTrace);
             return ErrorExitCode;
         }
         finally
@@ -81,9 +81,7 @@ public class AppOrchestrator(
             [var v] => $"v{v} (unknown)",
             _ => "v0.0.0 (unknown)",
         };
-        outputService.WriteLine(MediaSorterConstants.Separator);
-        outputService.WriteLine($"                      Vima MediaSorter {versionInfo}");
-        outputService.WriteLine(MediaSorterConstants.Separator);
+        outputService.Header($"                      Vima MediaSorter {versionInfo}");
         outputService.WriteLine();
     }
 
