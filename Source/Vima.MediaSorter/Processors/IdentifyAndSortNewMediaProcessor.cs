@@ -31,7 +31,7 @@ public class IdentifyAndSortNewMediaProcessor(
         {
             OutputConfiguration();
 
-            outputService.Header("[Step 1/2] Identification");
+            outputService.Section("[Step 1/2] Identification");
 
             var directoryStructure = outputService.ExecuteWithProgress(
                 "Identifying directories",
@@ -63,7 +63,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
             ReportIdentificationResults(directoryStructure, identified, associated);
 
-            outputService.Header("[Step 2/2] Sorting");
+            outputService.Section("[Step 2/2] Sorting");
 
             int totalFilesToMove =
                 identified.MediaFilesWithDates.Count + associated.AssociatedFiles.Count;
@@ -74,10 +74,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
             if (totalFilesToMove == 0)
             {
-                outputService.WriteLine("  No new media files found to sort.");
-                outputService.WriteLine();
-                outputService.WriteLine(MediaSorterConstants.Separator);
-                outputService.WriteLine();
+                outputService.Complete("  No new media files found to sort.");
                 return;
             }
 
@@ -87,10 +84,7 @@ public class IdentifyAndSortNewMediaProcessor(
                 )
             )
             {
-                outputService.WriteLine("  Operation aborted.");
-                outputService.WriteLine();
-                outputService.WriteLine(MediaSorterConstants.Separator);
-                outputService.WriteLine();
+                outputService.Complete("  Operation aborted.");
                 return;
             }
 
@@ -106,25 +100,24 @@ public class IdentifyAndSortNewMediaProcessor(
             if (sortingResult.Moved.Count > 0)
             {
                 outputService.WriteLine($"  Result: {sortingResult.Moved.Count} files moved.");
+                outputService.WriteLine();
             }
             else if (sortingResult.Duplicates.Count > 0)
             {
                 outputService.WriteLine("  Result: All files are already organised.");
+                outputService.WriteLine();
             }
 
             if (sortingResult.Errors.Count > 0)
             {
-                outputService.List(
-                    "Sorting Errors:",
-                    sortingResult
-                        .Errors.OrderByPath(x => x.SourcePath)
-                        .Select(e =>
-                            $"{fileSystem.GetRelativePath(e.SourcePath)}: {e.Exception.Message}"
-                        ),
-                    OutputLevel.Error
-                );
+                IEnumerable<string> sortingErrors = sortingResult
+                    .Errors.OrderByPath(x => x.SourcePath)
+                    .Select(e =>
+                        $"{fileSystem.GetRelativePath(e.SourcePath)}: {e.Exception.Message}"
+                    );
+                outputService.List("Sorting Errors:", sortingErrors, OutputLevel.Error, 5);
+                outputService.WriteLine(string.Empty, OutputLevel.Error);
             }
-            outputService.WriteLine();
 
             LogSorting(sortingResult);
 
@@ -201,8 +194,8 @@ public class IdentifyAndSortNewMediaProcessor(
 
         if (alerts.Count > 0)
         {
-            outputService.List("Alerts:", alerts, OutputLevel.Warn);
-            outputService.WriteLine("", OutputLevel.Warn);
+            outputService.List("Alerts:", alerts, OutputLevel.Warn, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Warn);
         }
 
         if (identificationErrorCount > 0)
@@ -212,13 +205,13 @@ public class IdentifyAndSortNewMediaProcessor(
                 .Select(error =>
                     $"{fileSystem.GetRelativePath(error.FilePath)}: {error.Exception.Message}"
                 );
-            outputService.List("Errors:", errors, OutputLevel.Error);
-            outputService.WriteLine("", OutputLevel.Error);
+            outputService.List("Errors:", errors, OutputLevel.Error, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Error);
         }
 
         if (identified.MediaFilesWithDates.Any())
         {
-            outputService.Header("Ready to move", OutputLevel.Debug);
+            outputService.Subsection("Ready to move", OutputLevel.Debug);
             var groups = identified
                 .MediaFilesWithDates.GroupBy(f => f.CreatedOn.Date.ToString("yyyy-MM-dd"))
                 .OrderBy(g => g.Key);
@@ -229,8 +222,8 @@ public class IdentifyAndSortNewMediaProcessor(
                     .OrderByPath(f => f.FilePath)
                     .SelectMany(file => (string[])[file.FilePath, .. file.RelatedFiles])
                     .Select(path => fileSystem.GetRelativePath(path));
-                outputService.List($"Folder: {group.Key}", files, OutputLevel.Debug);
-                outputService.WriteLine("", OutputLevel.Debug);
+                outputService.List($"Folder {group.Key}:", files, OutputLevel.Debug);
+                outputService.WriteLine(string.Empty, OutputLevel.Debug);
             }
         }
 
@@ -239,8 +232,9 @@ public class IdentifyAndSortNewMediaProcessor(
             var files = identified
                 .MediaFilesWithoutDates.OrderByPath(f => f.FilePath)
                 .Select(f => fileSystem.GetRelativePath(f.FilePath));
-            outputService.List("Missing metadata", files, OutputLevel.Debug);
-            outputService.WriteLine("", OutputLevel.Debug);
+            outputService.Subsection("Missing metadata", OutputLevel.Debug);
+            outputService.List(string.Empty, files, OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
 
         if (associated.RemainingIgnoredFiles.Any())
@@ -248,8 +242,9 @@ public class IdentifyAndSortNewMediaProcessor(
             var files = associated
                 .RemainingIgnoredFiles.OrderByPath(p => p)
                 .Select(p => fileSystem.GetRelativePath(p));
-            outputService.List("Unsupported files", files, OutputLevel.Debug);
-            outputService.WriteLine("", OutputLevel.Debug);
+            outputService.Subsection("Unsupported files", OutputLevel.Debug);
+            outputService.List(string.Empty, files, OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
     }
 
@@ -299,22 +294,19 @@ public class IdentifyAndSortNewMediaProcessor(
         if (deletedFiles.Count != 0)
         {
             var files = deletedFiles.OrderBy(f => f).Select(f => fileSystem.GetRelativePath(f));
-            outputService.List("Deleted", files, OutputLevel.Debug);
-            outputService.WriteLine("", OutputLevel.Debug);
+            outputService.List("Deleted:", files, OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
 
         if (deletionErrors.Count > 0)
         {
-            outputService.List(
-                "Deletion failures:",
-                deletionErrors
-                    .OrderByPath(x => x.FilePath)
-                    .Select(error =>
-                        $"{fileSystem.GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
-                    ),
-                OutputLevel.Error
-            );
-            outputService.WriteLine("", OutputLevel.Error);
+            IEnumerable<string> errors = deletionErrors
+                .OrderByPath(x => x.FilePath)
+                .Select(error =>
+                    $"{fileSystem.GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
+                );
+            outputService.List("Deletion failures:", errors, OutputLevel.Error, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Error);
         }
     }
 
@@ -327,8 +319,8 @@ public class IdentifyAndSortNewMediaProcessor(
                 .Select(m =>
                     $"{fileSystem.GetRelativePath(m.SourcePath)} -> {fileSystem.GetRelativePath(m.DestinationPath)}"
                 );
-            outputService.List("Successfully moved", items, OutputLevel.Debug);
-            outputService.WriteLine("", OutputLevel.Debug);
+            outputService.List("Successfully moved:", items, OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
 
         if (result.Duplicates.Any())
@@ -338,8 +330,8 @@ public class IdentifyAndSortNewMediaProcessor(
                 .Select(d =>
                     $"{fileSystem.GetRelativePath(d.SourcePath)} == {fileSystem.GetRelativePath(d.DestinationPath)}"
                 );
-            outputService.List("Duplicates detected", items, OutputLevel.Debug);
-            outputService.WriteLine("", OutputLevel.Debug);
+            outputService.List("Duplicates detected:", items, OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
     }
 }

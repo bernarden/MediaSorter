@@ -38,7 +38,7 @@ public class FindDuplicatesProcessor(
 
             var (visualHasher, threshold) = SelectVisualHasher();
 
-            outputService.Header("[Step 1/1] Duplicate Detection");
+            outputService.Section("[Step 1/1] Duplicate Detection");
             Stopwatch sw = Stopwatch.StartNew();
 
             List<string> allFiles =
@@ -77,8 +77,6 @@ public class FindDuplicatesProcessor(
             );
 
             ReviewDuplicates(allDuplicates, metadata);
-
-            outputService.Complete();
         }
         catch (Exception ex)
         {
@@ -124,18 +122,6 @@ public class FindDuplicatesProcessor(
             ]
         );
 
-        if (visualHasher != null)
-        {
-            outputService.Table(
-                "Visual detection configuration:",
-                [
-                    new("Hasher type:", visualHasher.Type.ToString()),
-                    new("Threshold:", threshold.ToString()),
-                ],
-                OutputLevel.Debug
-            );
-        }
-
         LogDuplicateGroups("Exact duplicates (byte-for-byte)", exactDuplicates, metadata);
 
         if (visualHasher != null)
@@ -152,8 +138,8 @@ public class FindDuplicatesProcessor(
             var errorDetails = errors
                 .OrderByPath(e => e.Path)
                 .Select(e => $"{fileSystem.GetRelativePath(e.Path)}: {e.Ex.Message}");
-            outputService.List("Errors:", errorDetails, OutputLevel.Error);
-            outputService.WriteLine("", OutputLevel.Error);
+            outputService.List("Errors:", errorDetails, OutputLevel.Error, 5);
+            outputService.WriteLine(string.Empty, OutputLevel.Error);
         }
     }
 
@@ -166,7 +152,7 @@ public class FindDuplicatesProcessor(
         if (groups.Count == 0)
             return;
 
-        outputService.Header(title, OutputLevel.Debug);
+        outputService.Subsection(title, OutputLevel.Debug);
         foreach (var group in groups)
         {
             var fileDetails = group
@@ -180,7 +166,7 @@ public class FindDuplicatesProcessor(
                 });
 
             outputService.List($"Group set ({group.Count} files):", fileDetails, OutputLevel.Debug);
-            outputService.WriteLine("", OutputLevel.Debug);
+            outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
     }
 
@@ -365,10 +351,7 @@ public class FindDuplicatesProcessor(
 
         if (!outputService.Confirm("Action: Interactively review duplicate groups one by one?"))
         {
-            outputService.WriteLine("  Operation aborted.");
-            outputService.WriteLine();
-            outputService.WriteLine(MediaSorterConstants.Separator);
-            outputService.WriteLine();
+            outputService.Complete("  Operation aborted.");
             return;
         }
 
@@ -393,8 +376,6 @@ public class FindDuplicatesProcessor(
                 );
             }
 
-            outputService.Flush();
-
             bool moveToNext = false;
             outputService.Write(menuPrompt);
             while (!moveToNext)
@@ -411,15 +392,13 @@ public class FindDuplicatesProcessor(
                         break;
                     case ConsoleKey.Q:
                         outputService.WriteLine(input.ToString());
-                        outputService.WriteLine();
-                        outputService.Flush();
+                        outputService.Complete();
                         return;
                 }
             }
-            outputService.Flush();
         }
 
-        outputService.WriteLine();
+        outputService.Complete();
     }
 
     private void OpenGroupFiles(List<string> group, string prompt)
@@ -448,7 +427,6 @@ public class FindDuplicatesProcessor(
         if (errorOccurred)
         {
             outputService.Write(prompt);
-            outputService.Flush();
         }
     }
 
