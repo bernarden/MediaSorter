@@ -64,6 +64,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
     private FileStream? _logFileStream;
     private string? _fullLogPath;
     private readonly Lock _lock = new();
+    private bool _isAtStartOfFileLine = true;
 
     public string LogFileName { get; set; } = "Vima.MediaSorter.log";
 
@@ -386,7 +387,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         }
 
         var finalOffset = ConvertOffsetToTimeSpan(offset.ToString());
-        LogToFile($"UTC offset -> {finalOffset}", OutputLevel.Info);
+        LogToFile($"UTC offset for media files: {offset}", OutputLevel.Info);
         return finalOffset;
 
         TimeSpan ConvertOffsetToTimeSpan(string offsetResult)
@@ -433,6 +434,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         {
             _console.WriteLine(message);
         }
+
         LogToFile(message ?? string.Empty, level);
     }
 
@@ -442,7 +444,8 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         {
             _console.Write(message);
         }
-        LogToFile(message, level);
+
+        LogToFile(message, level, false);
     }
 
     public string? ReadLine()
@@ -455,7 +458,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         return _console.ReadKey(intercept).Key;
     }
 
-    private void LogToFile(string message, OutputLevel level)
+    private void LogToFile(string message, OutputLevel level, bool addNewLine = true)
     {
         if (_logStreamWriter == null)
             return;
@@ -464,11 +467,28 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         {
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
             var levelStr = level.ToString().ToUpper().PadRight(5);
+            var prefix = $"[{timestamp}] [{levelStr}] ";
 
             var lines = message.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
-            foreach (var line in lines)
+            for (int i = 0; i < lines.Length; i++)
             {
-                _logStreamWriter.WriteLine($"[{timestamp}] [{levelStr}] {line}");
+                if (_isAtStartOfFileLine)
+                {
+                    _logStreamWriter.Write(prefix);
+                }
+
+                _logStreamWriter.Write(lines[i]);
+
+                var isLastLineOfBatch = i == lines.Length - 1;
+                if (!isLastLineOfBatch || addNewLine)
+                {
+                    _logStreamWriter.WriteLine();
+                    _isAtStartOfFileLine = true;
+                }
+                else
+                {
+                    _isAtStartOfFileLine = false;
+                }
             }
         }
     }
