@@ -29,35 +29,33 @@ public class FileMover(IFileSystem fileSystem, IDuplicateDetector duplicateDetec
             }
         );
 
-        string targetPath = Path.Combine(targetDirectory, targetFileName);
-        if (!fileSystem.FileExists(targetPath))
-            return ExecuteMoveWithRetries(sourceFilePath, targetPath);
-
-        if (duplicateDetector.AreIdentical(sourceFilePath, targetPath))
-            return new DuplicateDetectedFileMove(sourceFilePath, targetPath);
-
-        string uniqueTargetPath = GenerateUniqueTargetPath(targetDirectory, targetFileName);
-        return ExecuteMoveWithRetries(sourceFilePath, uniqueTargetPath);
-    }
-
-    private FileMove ExecuteMoveWithRetries(string source, string dest)
-    {
-        const int maxAttempts = 3;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        const int maxRetries = 5;
+        for (int attempt = 0; attempt < maxRetries; attempt++)
         {
+            string targetPath = Path.Combine(targetDirectory, targetFileName);
+
+            if (fileSystem.FileExists(targetPath))
+            {
+                if (duplicateDetector.AreIdentical(sourceFilePath, targetPath))
+                    return new DuplicateDetectedFileMove(sourceFilePath, targetPath);
+
+                targetPath = GenerateUniqueTargetPath(targetDirectory, targetFileName);
+            }
+
             try
             {
-                fileSystem.Move(source, dest);
-                return new SuccessfulFileMove(source, dest);
+                fileSystem.Move(sourceFilePath, targetPath);
+                return new SuccessfulFileMove(sourceFilePath, targetPath);
             }
-            catch (Exception ex) when (IsTransient(ex) && attempt < maxAttempts)
+            catch (IOException ex) when (IsTransient(ex) && attempt < maxRetries - 1)
             {
-                Thread.Sleep(attempt * 150);
+                Thread.Sleep(Random.Shared.Next(10, 50));
             }
         }
 
-        fileSystem.Move(source, dest);
-        return new SuccessfulFileMove(source, dest);
+        throw new IOException(
+            $"Could not move {sourceFilePath} after {maxRetries} attempts due to name collisions."
+        );
     }
 
     private static bool IsTransient(Exception ex) =>
