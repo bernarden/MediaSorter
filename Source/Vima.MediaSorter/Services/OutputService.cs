@@ -247,6 +247,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         if (!string.IsNullOrWhiteSpace(message))
         {
             WriteLine(message);
+            WriteLine();
         }
 
         WriteLine(MediaSorterConstants.Separator);

@@ -392,12 +392,14 @@ public class FindDuplicatesProcessor(
                         break;
                     case ConsoleKey.Q:
                         outputService.WriteLine(input.ToString());
+                        outputService.WriteLine();
                         outputService.Complete();
                         return;
                 }
             }
         }
 
+        outputService.WriteLine();
         outputService.Complete();
     }
 
