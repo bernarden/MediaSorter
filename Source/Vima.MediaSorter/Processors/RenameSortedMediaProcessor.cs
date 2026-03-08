@@ -39,8 +39,7 @@ public class RenameSortedMediaProcessor(
             );
             if (directoryStructure.SortedFolders.Count == 0)
             {
-                outputService.WriteLine("  No sorted folders found to process.");
-                outputService.WriteLine();
+                outputService.Complete("No sorted folders found to process.");
                 return;
             }
 
@@ -75,7 +74,7 @@ public class RenameSortedMediaProcessor(
 
             if (renamePlan.Count == 0)
             {
-                outputService.Complete("  All files already match the naming convention.");
+                outputService.Complete("All files already match the naming convention.");
                 return;
             }
 

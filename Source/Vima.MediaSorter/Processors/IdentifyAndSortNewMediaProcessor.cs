@@ -75,7 +75,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
             if (totalFilesToMove == 0)
             {
-                outputService.Complete("  No new media files found to sort.");
+                outputService.Complete("No new media files found to sort.");
                 return;
             }
 

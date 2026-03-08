@@ -76,6 +76,12 @@ public class FindDuplicatesProcessor(
                 sw.Elapsed
             );
 
+            if (allDuplicates.Count == 0)
+            {
+                outputService.Complete("No duplicates were detected.");
+                return;
+            }
+
             ReviewDuplicates(allDuplicates, metadata);
         }
         catch (Exception ex)
@@ -346,9 +352,6 @@ public class FindDuplicatesProcessor(
         ConcurrentDictionary<string, (long size, int width, int height)> metadata
     )
     {
-        if (groups.Count == 0)
-            return;
-
         if (!outputService.Confirm("Action: Interactively review duplicate groups one by one?"))
         {
             outputService.Complete("  Operation aborted.");

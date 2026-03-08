@@ -44,7 +44,7 @@ public class CleanupRawMediaProcessor(
             int totalOrphanedCount = deletionPlan.Sum(p => p.Value.Count);
             if (totalOrphanedCount == 0)
             {
-                outputService.Complete("  Everything is in sync. No RAW files need to be deleted.");
+                outputService.Complete("Everything is in sync. No RAW files need to be deleted.");
                 return;
             }
 
