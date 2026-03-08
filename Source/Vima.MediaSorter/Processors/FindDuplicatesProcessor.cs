@@ -36,11 +36,6 @@ public class FindDuplicatesProcessor(
         {
             OutputConfiguration();
 
-            var (visualHasher, threshold) = SelectVisualHasher();
-
-            outputService.Section("[Step 1/1] Duplicate Detection");
-            Stopwatch sw = Stopwatch.StartNew();
-
             List<string> allFiles =
             [
                 .. fileSystem.EnumerateFiles(
@@ -49,6 +44,12 @@ public class FindDuplicatesProcessor(
                     SearchOption.AllDirectories
                 ),
             ];
+            string? targetFolder = SelectTargetFolder(allFiles);
+
+            var (visualHasher, threshold) = SelectVisualHasher();
+
+            outputService.Section("[Step 1/1] Duplicate Detection");
+            Stopwatch sw = Stopwatch.StartNew();
 
             var (visualHashes, binaryHashes, metadata, errors) = GenerateHashes(
                 visualHasher,
@@ -58,7 +59,8 @@ public class FindDuplicatesProcessor(
             var (exactDuplicates, visualDuplicates) = ClusterDuplicates(
                 threshold,
                 visualHashes,
-                binaryHashes
+                binaryHashes,
+                targetFolder
             );
 
             sw.Stop();
@@ -72,7 +74,6 @@ public class FindDuplicatesProcessor(
                 metadata,
                 errors,
                 visualHasher,
-                threshold,
                 sw.Elapsed
             );
 
@@ -110,12 +111,12 @@ public class FindDuplicatesProcessor(
         ConcurrentDictionary<string, (long size, int width, int height)> metadata,
         ConcurrentBag<(string Path, Exception Ex)> errors,
         IVisualFileHasher? visualHasher,
-        int threshold,
         TimeSpan duration
     )
     {
         int duplicateSets = allDuplicates.Count;
-        int redundantFiles = allDuplicates.Sum(d => d.Count) - duplicateSets;
+        int exactRedundant = exactDuplicates.Sum(d => d.Count - 1);
+        int visualRedundant = visualDuplicates.Sum(d => d.Count - 1);
 
         outputService.Table(
             "Analysis result:",
@@ -123,7 +124,9 @@ public class FindDuplicatesProcessor(
                 new("Total scanned:", allFiles.Count.ToString()),
                 new("Detection time:", duration.ToString(@"hh\:mm\:ss\.ff")),
                 new("Duplicate sets:", duplicateSets.ToString()),
-                new("Redundant files:", redundantFiles.ToString()),
+                new("Duplicate files:", (exactRedundant + visualRedundant).ToString()),
+                new("  Exact:", exactRedundant.ToString()),
+                new("  Visual:", visualRedundant.ToString()),
                 new("Errors:", errors.Count.ToString(), !errors.IsEmpty),
             ]
         );
@@ -242,54 +245,60 @@ public class FindDuplicatesProcessor(
     ) ClusterDuplicates(
         int threshold,
         ConcurrentDictionary<string, ulong> visualHashes,
-        ConcurrentDictionary<string, string> binaryHashes
+        ConcurrentDictionary<string, string> binaryHashes,
+        string? targetFolder = null
     )
     {
         return outputService.ExecuteWithProgress(
             "Clustering duplicates",
             p =>
             {
-                List<List<string>> binaryDuplicates = new();
+                List<List<string>> binaryDuplicates = binaryHashes
+                    .GroupBy(x => x.Value)
+                    .Select(g => g.Select(x => x.Key).ToList())
+                    .Where(paths =>
+                        paths.Count > 1
+                        && (targetFolder == null || paths.Any(p => p.StartsWith(targetFolder)))
+                    )
+                    .ToList();
+
                 List<List<string>> visualDuplicates = new();
+                var processed = new HashSet<string>();
+                var paths = visualHashes.Keys.ToList();
+                var targetPaths =
+                    targetFolder == null
+                        ? paths
+                        : paths.Where(path => path.StartsWith(targetFolder)).ToList();
 
-                var binaryGroups = binaryHashes.GroupBy(x => x.Value).Where(g => g.Count() > 1);
-                foreach (var group in binaryGroups)
+                for (int i = 0; i < targetPaths.Count; i++)
                 {
-                    binaryDuplicates.Add([.. group.Select(x => x.Key)]);
-                }
-
-                if (!visualHashes.IsEmpty)
-                {
-                    var paths = visualHashes.Keys.ToList();
-                    var processed = new HashSet<string>();
-
-                    for (int i = 0; i < paths.Count; i++)
+                    string targetPath = targetPaths[i];
+                    if (!processed.Contains(targetPath))
                     {
-                        if (!processed.Contains(paths[i]))
+                        var currentSet = new List<string> { targetPath };
+                        ulong h1 = visualHashes[targetPath];
+
+                        for (int j = i + 1; j < paths.Count; j++)
                         {
-                            var currentSet = new List<string> { paths[i] };
-                            ulong h1 = visualHashes[paths[i]];
+                            string anotherPath = paths[j];
+                            if (processed.Contains(anotherPath) || targetPath == anotherPath)
+                                continue;
 
-                            for (int j = i + 1; j < paths.Count; j++)
+                            var h2 = visualHashes[anotherPath];
+                            if (BitOperations.PopCount(h1 ^ h2) <= threshold)
                             {
-                                if (processed.Contains(paths[j]))
-                                    continue;
-
-                                var h2 = visualHashes[paths[j]];
-                                if (BitOperations.PopCount(h1 ^ h2) <= threshold)
-                                {
-                                    currentSet.Add(paths[j]);
-                                    processed.Add(paths[j]);
-                                }
+                                currentSet.Add(anotherPath);
+                                processed.Add(anotherPath);
                             }
-
-                            if (currentSet.Count > 1)
-                                visualDuplicates.Add(currentSet);
-                            processed.Add(paths[i]);
                         }
 
-                        p.Report((double)i / paths.Count);
+                        if (currentSet.Count > 1)
+                            visualDuplicates.Add(currentSet);
+
+                        processed.Add(targetPath);
                     }
+
+                    p.Report((double)i / targetPaths.Count);
                 }
 
                 p.Report(1.0);
@@ -358,7 +367,7 @@ public class FindDuplicatesProcessor(
             return;
         }
 
-        string menuPrompt = "[V] View Files | [N] Next Group | [Q] Quit Review: ";
+        string menuPrompt = "[V]iew files | [N]ext group | [Q]uit review: ";
 
         for (int i = 0; i < groups.Count; i++)
         {
@@ -404,6 +413,45 @@ public class FindDuplicatesProcessor(
 
         outputService.WriteLine();
         outputService.Complete();
+    }
+
+    private string? SelectTargetFolder(List<string> allFiles)
+    {
+        outputService.WriteLine("Duplicate search scopes:");
+        outputService.WriteLine(
+            "  [0] Global (default): Compare every file against every other file."
+        );
+        outputService.WriteLine(
+            "  [1] Targeted: Select one folder and find where its files are duplicated."
+        );
+        outputService.WriteLine();
+        var mode = outputService.PromptForInt("Select search scope", 0, 0, 1);
+        outputService.WriteLine();
+
+        if (mode == 0)
+            return null;
+
+        var folders = allFiles
+            .Select(Path.GetDirectoryName)
+            .Where(d => d != null)
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList();
+        int maxDigits = folders.Count.ToString().Length;
+        var folderOptions = folders.Select(
+            (path, i) =>
+            {
+                string prefix = $"[{i}]".PadLeft(maxDigits + 2);
+                string relativePath = fileSystem.GetRelativePath(path);
+                string displayPath = string.IsNullOrEmpty(relativePath) ? "." : relativePath;
+                return $"{prefix} {displayPath}";
+            }
+        );
+        outputService.List("Target folders:", folderOptions);
+
+        int choice = outputService.PromptForInt("Select folder index", 0, 0, folders.Count - 1);
+        outputService.WriteLine();
+        return folders[choice];
     }
 
     private void OpenGroupFiles(List<string> group, string prompt)
