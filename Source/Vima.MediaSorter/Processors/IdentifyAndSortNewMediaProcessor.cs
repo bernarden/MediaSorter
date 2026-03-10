@@ -448,9 +448,7 @@ public class IdentifyAndSortNewMediaProcessor(
         {
             IEnumerable<string> sortingErrors = result
                 .Errors.OrderByPath(x => x.SourcePath)
-                .Select(e =>
-                    $"{fileSystem.GetRelativePath(e.SourcePath)}: {e.Exception.Message}"
-                );
+                .Select(e => $"{fileSystem.GetRelativePath(e.SourcePath)}: {e.Exception.Message}");
             outputService.List("Sorting Errors:", sortingErrors, OutputLevel.Error, 5);
             outputService.WriteLine(string.Empty, OutputLevel.Error);
         }

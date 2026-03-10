@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -24,7 +25,30 @@ public class FindDuplicatesProcessor(
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
-    private static readonly string[] ImageExtensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp"];
+    private readonly Lock CacheFileSaveLock = new();
+    private readonly string cacheFilePath = Path.Combine(
+        options.Value.Directory,
+        "Vima.MediaSorter.Hashes.jsonl"
+    );
+
+    private readonly (
+        IVisualFileHasher Avg,
+        IVisualFileHasher Diff,
+        IVisualFileHasher Perc
+    ) hashers = (
+        Avg: visualHashers.First(x => x.Type == VisualHasherType.Average),
+        Diff: visualHashers.First(x => x.Type == VisualHasherType.Difference),
+        Perc: visualHashers.First(x => x.Type == VisualHasherType.Perceptual)
+    );
+
+    private readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".bmp",
+    };
 
     public ProcessorOptions Option => ProcessorOptions.FindDuplicates;
 
@@ -51,15 +75,12 @@ public class FindDuplicatesProcessor(
             outputService.Section("[Step 1/1] Duplicate Detection");
             Stopwatch sw = Stopwatch.StartNew();
 
-            var (visualHashes, binaryHashes, metadata, errors) = GenerateHashes(
-                visualHasher,
-                allFiles
-            );
+            var (hashes, errors) = GenerateHashes(allFiles);
 
             var (exactDuplicates, visualDuplicates) = ClusterDuplicates(
+                visualHasher,
                 threshold,
-                visualHashes,
-                binaryHashes,
+                hashes,
                 targetFolder
             );
 
@@ -71,7 +92,7 @@ public class FindDuplicatesProcessor(
                 allDuplicates,
                 exactDuplicates,
                 visualDuplicates,
-                metadata,
+                hashes,
                 errors,
                 visualHasher,
                 sw.Elapsed
@@ -83,7 +104,7 @@ public class FindDuplicatesProcessor(
                 return;
             }
 
-            ReviewDuplicates(allDuplicates, metadata);
+            ReviewDuplicates(allDuplicates, hashes);
         }
         catch (Exception ex)
         {
@@ -108,7 +129,7 @@ public class FindDuplicatesProcessor(
         List<List<string>> allDuplicates,
         List<List<string>> exactDuplicates,
         List<List<string>> visualDuplicates,
-        ConcurrentDictionary<string, (long size, int width, int height)> metadata,
+        ConcurrentDictionary<string, FindDuplicatesFile> hashes,
         ConcurrentBag<(string Path, Exception Ex)> errors,
         IVisualFileHasher? visualHasher,
         TimeSpan duration
@@ -131,14 +152,14 @@ public class FindDuplicatesProcessor(
             ]
         );
 
-        LogDuplicateGroups("Exact duplicates (byte-for-byte)", exactDuplicates, metadata);
+        LogDuplicateGroups("Exact duplicates (byte-for-byte)", exactDuplicates, hashes);
 
         if (visualHasher != null)
         {
             LogDuplicateGroups(
                 $"Visual duplicates ({visualHasher.Type})",
                 visualDuplicates,
-                metadata
+                hashes
             );
         }
 
@@ -155,7 +176,7 @@ public class FindDuplicatesProcessor(
     private void LogDuplicateGroups(
         string title,
         List<List<string>> groups,
-        ConcurrentDictionary<string, (long size, int width, int height)> metadata
+        ConcurrentDictionary<string, FindDuplicatesFile> hashes
     )
     {
         if (groups.Count == 0)
@@ -165,13 +186,15 @@ public class FindDuplicatesProcessor(
         foreach (var group in groups)
         {
             var fileDetails = group
-                .OrderByDescending(path => metadata[path].width * metadata[path].height)
-                .ThenByDescending(path => metadata[path].size)
+                .OrderByDescending(path => hashes[path].Width * hashes[path].Height)
+                .ThenByDescending(path => hashes[path].Size)
                 .Select(path =>
                 {
-                    var (size, w, h) = metadata[path];
-                    string resolution = w > 0 ? $"{w}x{h}" : "N/A";
-                    return $"{fileSystem.GetRelativePath(path)} [{resolution} | {FormatFileSize(size)}]";
+                    string resolution =
+                        hashes[path].Width > 0
+                            ? $"{hashes[path].Width}x{hashes[path].Height}"
+                            : "N/A";
+                    return $"{fileSystem.GetRelativePath(path)} [{resolution} | {FormatFileSize(hashes[path].Size)}]";
                 });
 
             outputService.List($"Group set ({group.Count} files):", fileDetails, OutputLevel.Debug);
@@ -180,21 +203,21 @@ public class FindDuplicatesProcessor(
     }
 
     private (
-        ConcurrentDictionary<string, ulong> visualHashes,
-        ConcurrentDictionary<string, string> binaryHashes,
-        ConcurrentDictionary<string, (long size, int width, int height)> metadata,
+        ConcurrentDictionary<string, FindDuplicatesFile> hashes,
         ConcurrentBag<(string Path, Exception Ex)> errors
-    ) GenerateHashes(IVisualFileHasher? visualHasher, List<string> allFiles)
+    ) GenerateHashes(List<string> allFiles)
     {
+        var cache = LoadCache();
+
+        var results = new ConcurrentDictionary<string, FindDuplicatesFile>();
+        var errors = new ConcurrentBag<(string Path, Exception Ex)>();
+
         return outputService.ExecuteWithProgress(
             "Generating hashes",
             p =>
             {
                 int processed = 0;
-                ConcurrentDictionary<string, ulong> visualHashes = new();
-                ConcurrentDictionary<string, string> binaryHashes = new();
-                ConcurrentDictionary<string, (long size, int width, int height)> metadata = new();
-                ConcurrentBag<(string Path, Exception Ex)> errors = new();
+
                 Parallel.ForEach(
                     allFiles,
                     new ParallelOptions { MaxDegreeOfParallelism = 25 },
@@ -202,25 +225,25 @@ public class FindDuplicatesProcessor(
                     {
                         try
                         {
-                            var ext = Path.GetExtension(path).ToLower();
+                            var lastWrite = fileSystem.GetLastWriteTimeUtc(path);
                             long fileSize = fileSystem.GetFileSize(path);
-                            if (visualHasher != null && ImageExtensions.Contains(ext))
+
+                            if (
+                                cache.TryGetValue(path, out var cachedEntry)
+                                && cachedEntry.LastModified == lastWrite
+                                && cachedEntry.Size == fileSize
+                            )
                             {
-                                using var stream = fileSystem.CreateFileStream(
-                                    path,
-                                    FileMode.Open,
-                                    FileAccess.Read
-                                );
-                                using var bitmap =
-                                    SKBitmap.Decode(stream)
-                                    ?? throw new Exception("Failed to decode the image.");
-                                metadata[path] = (fileSize, bitmap.Width, bitmap.Height);
-                                visualHashes[path] = visualHasher.GetHash(bitmap);
+                                results[path] = cachedEntry;
                             }
                             else
                             {
-                                binaryHashes[path] = fileHasher.GetHash(path);
-                                metadata[path] = (fileSize, 0, 0);
+                                results[path] = CreateCacheEntry(path, fileSize, lastWrite);
+                            }
+
+                            if (processed % 1000 == 0)
+                            {
+                                SaveCache([.. results.Values]);
                             }
                         }
                         catch (Exception ex)
@@ -234,8 +257,39 @@ public class FindDuplicatesProcessor(
                     }
                 );
 
-                return (visualHashes, binaryHashes, metadata, errors);
+                SaveCache([.. results.Values]);
+                return (results, errors);
             }
+        );
+    }
+
+    private FindDuplicatesFile CreateCacheEntry(string path, long fileSize, DateTime lastWrite)
+    {
+        string bHash = fileHasher.GetHash(path);
+
+        if (!ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+        {
+            return new FindDuplicatesFile(path, bHash, 0, 0, 0, fileSize, 0, 0, lastWrite);
+        }
+
+        using var stream = fileSystem.CreateFileStream(path, FileMode.Open, FileAccess.Read);
+        using var bitmap = SKBitmap.Decode(stream);
+
+        if (bitmap == null)
+        {
+            return new FindDuplicatesFile(path, bHash, 0, 0, 0, fileSize, 0, 0, lastWrite);
+        }
+
+        return new FindDuplicatesFile(
+            path,
+            bHash,
+            hashers.Avg?.GetHash(bitmap) ?? 0,
+            hashers.Diff?.GetHash(bitmap) ?? 0,
+            hashers.Perc?.GetHash(bitmap) ?? 0,
+            fileSize,
+            bitmap.Width,
+            bitmap.Height,
+            lastWrite
         );
     }
 
@@ -243,9 +297,9 @@ public class FindDuplicatesProcessor(
         List<List<string>> binaryDuplicates,
         List<List<string>> visualDuplicates
     ) ClusterDuplicates(
+        IVisualFileHasher? visualHasher,
         int threshold,
-        ConcurrentDictionary<string, ulong> visualHashes,
-        ConcurrentDictionary<string, string> binaryHashes,
+        ConcurrentDictionary<string, FindDuplicatesFile> hashes,
         string? targetFolder = null
     )
     {
@@ -253,9 +307,9 @@ public class FindDuplicatesProcessor(
             "Clustering duplicates",
             p =>
             {
-                List<List<string>> binaryDuplicates = binaryHashes
-                    .GroupBy(x => x.Value)
-                    .Select(g => g.Select(x => x.Key).ToList())
+                List<List<string>> binaryDuplicates = hashes
+                    .Values.GroupBy(entry => entry.BinaryHash)
+                    .Select(group => group.Select(entry => entry.Path).ToList())
                     .Where(paths =>
                         paths.Count > 1
                         && (targetFolder == null || paths.Any(p => p.StartsWith(targetFolder)))
@@ -264,6 +318,20 @@ public class FindDuplicatesProcessor(
 
                 List<List<string>> visualDuplicates = new();
                 var processed = new HashSet<string>();
+                var visualHashes = hashes
+                    .Select(kvp => new
+                    {
+                        kvp.Key,
+                        Hash = visualHasher?.Type switch
+                        {
+                            VisualHasherType.Average => kvp.Value.AverageHash,
+                            VisualHasherType.Difference => kvp.Value.DifferenceHash,
+                            VisualHasherType.Perceptual => kvp.Value.PerceptualHash,
+                            _ => 0UL,
+                        },
+                    })
+                    .Where(x => x.Hash != 0)
+                    .ToDictionary(x => x.Key, x => x.Hash);
                 var paths = visualHashes.Keys.ToList();
                 var targetPaths =
                     targetFolder == null
@@ -358,7 +426,7 @@ public class FindDuplicatesProcessor(
 
     private void ReviewDuplicates(
         List<List<string>> groups,
-        ConcurrentDictionary<string, (long size, int width, int height)> metadata
+        ConcurrentDictionary<string, FindDuplicatesFile> hashes
     )
     {
         if (!outputService.Confirm("Action: Interactively review duplicate groups one by one?"))
@@ -375,16 +443,16 @@ public class FindDuplicatesProcessor(
             outputService.WriteLine($"Group {i + 1}/{groups.Count} ({groups[i].Count} files)");
 
             var sortedGroup = groups[i]
-                .OrderByDescending(path => metadata[path].width * metadata[path].height)
-                .ThenByDescending(path => metadata[path].size)
+                .OrderByDescending(path => hashes[path].Width * hashes[path].Height)
+                .ThenByDescending(path => hashes[path].Size)
                 .ToList();
             foreach (var path in sortedGroup)
             {
-                var (size, w, h) = metadata[path];
-                string resolution = w > 0 ? $"{w}x{h}" : "N/A";
+                string resolution =
+                    hashes[path].Width > 0 ? $"{hashes[path].Width}x{hashes[path].Height}" : "N/A";
                 string relativePath = fileSystem.GetRelativePath(path);
                 outputService.WriteLine(
-                    $"  - {relativePath} [{resolution} | {FormatFileSize(size)}]"
+                    $"  - {relativePath} [{resolution} | {FormatFileSize(hashes[path].Size)}]"
                 );
             }
 
@@ -413,6 +481,71 @@ public class FindDuplicatesProcessor(
 
         outputService.WriteLine();
         outputService.Complete();
+    }
+
+    private void SaveCache(IEnumerable<FindDuplicatesFile> entries)
+    {
+        lock (CacheFileSaveLock)
+        {
+            using var stream = fileSystem.CreateFileStream(
+                cacheFilePath,
+                FileMode.Create,
+                FileAccess.Write
+            );
+            using var writer = new StreamWriter(stream);
+            foreach (var entry in entries)
+            {
+                string entryJson = JsonSerializer.Serialize(
+                    entry,
+                    SourceGenerationContext.Default.FindDuplicatesFile
+                );
+                writer.WriteLine(entryJson);
+            }
+        }
+    }
+
+    private Dictionary<string, FindDuplicatesFile> LoadCache()
+    {
+        var cache = new Dictionary<string, FindDuplicatesFile>();
+
+        if (!fileSystem.FileExists(cacheFilePath))
+        {
+            return cache;
+        }
+
+        try
+        {
+            using var stream = fileSystem.CreateFileStream(
+                cacheFilePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read
+            );
+            using var reader = new StreamReader(stream);
+
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                try
+                {
+                    var entry = JsonSerializer.Deserialize(
+                        line,
+                        SourceGenerationContext.Default.FindDuplicatesFile
+                    );
+                    if (entry != null)
+                    {
+                        cache[entry.Path] = entry;
+                    }
+                }
+                catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            outputService.WriteLine($"Could not load cache: {ex.Message}", OutputLevel.Error);
+        }
+
+        return cache;
     }
 
     private string? SelectTargetFolder(List<string> allFiles)
