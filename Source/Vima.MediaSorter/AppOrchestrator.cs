@@ -114,10 +114,7 @@ public class AppOrchestrator(
         outputService.WriteLine($"  [{(int)ProcessorOptions.Exit}] Exit (default)");
         outputService.WriteLine();
 
-        ProcessorOptions result = outputService.PromptForEnum(
-            "Enter choice",
-            ProcessorOptions.Exit
-        );
-        return result;
+        int result = outputService.PromptForInt("Enter choice", (int)ProcessorOptions.Exit, 0, 4);
+        return (ProcessorOptions)result;
     }
 }
