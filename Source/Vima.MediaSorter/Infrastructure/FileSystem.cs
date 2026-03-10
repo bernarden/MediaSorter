@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.Extensions.Options;
@@ -35,6 +36,7 @@ public interface IFileSystem
     );
     long GetFileSize(string path);
     string GetRelativePath(string? path, string? relativeTo = null);
+    DateTime GetLastWriteTimeUtc(string path);
 }
 
 public class FileSystem(IOptions<MediaSorterOptions> options) : IFileSystem
@@ -112,5 +114,10 @@ public class FileSystem(IOptions<MediaSorterOptions> options) : IFileSystem
             return string.Empty;
 
         return Path.GetRelativePath(relativeTo ?? _options.Directory, path);
+    }
+
+    public DateTime GetLastWriteTimeUtc(string path)
+    {
+        return new FileInfo(path).LastWriteTimeUtc;
     }
 }
