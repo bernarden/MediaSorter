@@ -326,7 +326,7 @@ public class FindDuplicatesProcessor(
             $"Note: Visual modes only apply to: {string.Join(", ", ImageExtensions)}"
         );
         outputService.WriteLine();
-        var choice = outputService.PromptForEnum<VisualHasherType>("Select mode", 0);
+        var choice = (VisualHasherType)outputService.PromptForInt("Select mode", 0, 0, 3);
         if ((int)choice == 0)
         {
             outputService.WriteLine();

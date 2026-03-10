@@ -36,8 +36,6 @@ public interface IOutputService
     );
 
     bool Confirm(string question, ConsoleKey defaultAnswer = ConsoleKey.N);
-    T PromptForEnum<T>(string prompt, T defaultValue)
-        where T : struct, Enum;
     int PromptForInt(
         string prompt,
         int defaultValue,
@@ -283,36 +281,6 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         _console.WriteLine($"Done ({duration}).");
         LogToFile($"{label}... Done ({duration}).", OutputLevel.Info);
         return result;
-    }
-
-    public T PromptForEnum<T>(string prompt, T defaultValue)
-        where T : struct, Enum
-    {
-        T selected;
-        string formattedPrompt = $"{prompt}: ";
-
-        while (true)
-        {
-            _console.Write(formattedPrompt);
-            string? input = _console.ReadLine()?.Trim();
-            bool isDefault = string.IsNullOrEmpty(input);
-
-            if (isDefault)
-            {
-                selected = defaultValue;
-                _console.RewriteLine($"{formattedPrompt}{Convert.ToInt32(selected)}");
-                break;
-            }
-
-            if (int.TryParse(input, out int intChoice) && Enum.IsDefined(typeof(T), intChoice))
-            {
-                selected = (T)Enum.ToObject(typeof(T), intChoice);
-                break;
-            }
-        }
-
-        LogToFile($"{formattedPrompt}{Convert.ToInt32(selected)}", OutputLevel.Info);
-        return selected;
     }
 
     public int PromptForInt(
