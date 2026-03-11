@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Services;
-using Vima.MediaSorter.Services.MediaFileHandlers;
 
 namespace Vima.MediaSorter;
 
@@ -17,7 +16,6 @@ public interface IAppOrchestrator
 
 public class AppOrchestrator(
     IEnumerable<IProcessor> processors,
-    IEnumerable<IMediaFileHandler> mediaFileHandlers,
     IOutputService outputService,
     IOptions<MediaSorterOptions> options
 ) : IAppOrchestrator
@@ -32,13 +30,14 @@ public class AppOrchestrator(
         {
             outputService.Initialize();
 
-            OutputHeader(mediaFileHandlers);
+            OutputHeader();
 
             // CLI execution hides the menu and runs only the selected processor.
             if (preselectedOption != ProcessorOptions.None)
             {
                 outputService.WriteLine(
-                    $"Mode: Automatic selection via command-line argument (-p {preselectedOption})."
+                    $"Mode: Automatic selection via command-line argument (-p {preselectedOption}).",
+                    OutputLevel.Info
                 );
                 return ExecuteByOption(preselectedOption);
             }
@@ -56,20 +55,17 @@ public class AppOrchestrator(
         }
         catch (Exception ex)
         {
-            outputService.WriteLine();
-            outputService.Section("A critical error occurred");
-            outputService.WriteLine(ex.Message);
-            outputService.WriteLine(ex.StackTrace);
+            outputService.Fatal("A critical error occurred", ex);
             return ErrorExitCode;
         }
         finally
         {
-            outputService.WriteLine("Press enter to finish...");
+            outputService.WriteLine("Press enter to finish...", OutputLevel.Info);
             outputService.ReadLine();
         }
     }
 
-    private void OutputHeader(IEnumerable<IMediaFileHandler> mediaFileHandlers)
+    private void OutputHeader()
     {
         var assemblyVersion = Assembly
             .GetExecutingAssembly()
@@ -81,8 +77,11 @@ public class AppOrchestrator(
             [var v] => $"v{v} (unknown)",
             _ => "v0.0.0 (unknown)",
         };
-        outputService.Header($"                      Vima MediaSorter {versionInfo}");
-        outputService.WriteLine();
+        outputService.Header(
+            $"                      Vima MediaSorter {versionInfo}",
+            OutputLevel.Info
+        );
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
     }
 
     private int ExecuteByOption(ProcessorOptions option)
@@ -90,7 +89,10 @@ public class AppOrchestrator(
         var processor = processors.FirstOrDefault(p => p.Option == option);
         if (processor == null)
         {
-            outputService.WriteLine($"Error: No processor found for option {option}");
+            outputService.WriteLine(
+                $"Error: No processor found for option {option}",
+                OutputLevel.Info
+            );
             return ErrorExitCode;
         }
 
@@ -100,21 +102,36 @@ public class AppOrchestrator(
 
     private ProcessorOptions GetProcessorOption()
     {
-        outputService.WriteLine("Available actions:");
+        outputService.WriteLine("Available actions:", OutputLevel.Info);
         outputService.WriteLine(
-            $"  [{(int)ProcessorOptions.IdentifyAndSortNewMedia}] Identify and sort new media"
-        );
-        outputService.WriteLine($"  [{(int)ProcessorOptions.FindDuplicates}] Find duplicates");
-        outputService.WriteLine(
-            $"  [{(int)ProcessorOptions.RenameSortedMedia}] Rename media in sorted folders"
+            $"  [{(int)ProcessorOptions.IdentifyAndSortNewMedia}] Identify and sort new media",
+            OutputLevel.Info
         );
         outputService.WriteLine(
-            $"  [{(int)ProcessorOptions.CleanupRawMedia}] Cleanup orphaned RAW files"
+            $"  [{(int)ProcessorOptions.FindDuplicates}] Find duplicates",
+            OutputLevel.Info
         );
-        outputService.WriteLine($"  [{(int)ProcessorOptions.Exit}] Exit (default)");
-        outputService.WriteLine();
+        outputService.WriteLine(
+            $"  [{(int)ProcessorOptions.RenameSortedMedia}] Rename media in sorted folders",
+            OutputLevel.Info
+        );
+        outputService.WriteLine(
+            $"  [{(int)ProcessorOptions.CleanupRawMedia}] Cleanup orphaned RAW files",
+            OutputLevel.Info
+        );
+        outputService.WriteLine(
+            $"  [{(int)ProcessorOptions.Exit}] Exit (default)",
+            OutputLevel.Info
+        );
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
 
-        int result = outputService.PromptForInt("Enter choice", (int)ProcessorOptions.Exit, 0, 4);
+        int result = outputService.PromptForInt(
+            "Enter choice",
+            (int)ProcessorOptions.Exit,
+            0,
+            4,
+            OutputLevel.Info
+        );
         return (ProcessorOptions)result;
     }
 }

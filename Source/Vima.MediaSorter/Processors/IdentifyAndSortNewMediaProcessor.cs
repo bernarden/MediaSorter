@@ -32,7 +32,7 @@ public class IdentifyAndSortNewMediaProcessor(
         {
             OutputConfiguration();
 
-            outputService.Section("[Step 1/2] Identification");
+            outputService.Section("[Step 1/2] Identification", OutputLevel.Info);
 
             var directoryStructure = outputService.ExecuteWithProgress(
                 "Identifying directories",
@@ -44,7 +44,7 @@ public class IdentifyAndSortNewMediaProcessor(
             {
                 string question =
                     $"Action: Include {directoryStructure.UnsortedFolders.Count} unsorted sub-folder(s) in scan?";
-                if (outputService.Confirm(question))
+                if (outputService.Confirm(question, OutputLevel.Info))
                 {
                     directoriesToScan.AddRange(directoryStructure.UnsortedFolders);
                 }
@@ -64,7 +64,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
             ReportIdentificationResults(directoryStructure, identified, associated);
 
-            outputService.Section("[Step 2/2] Sorting");
+            outputService.Section("[Step 2/2] Sorting", OutputLevel.Info);
 
             int totalFilesToMove =
                 identified.MediaFilesWithDates.Count + associated.AssociatedFiles.Count;
@@ -81,7 +81,8 @@ public class IdentifyAndSortNewMediaProcessor(
 
             if (
                 !outputService.Confirm(
-                    $"Action: Sort {totalFilesToMove} file(s) into {targetFolderCount} date folder(s)?"
+                    $"Action: Sort {totalFilesToMove} file(s) into {targetFolderCount} date folder(s)?",
+                    OutputLevel.Info
                 )
             )
             {
@@ -100,13 +101,19 @@ public class IdentifyAndSortNewMediaProcessor(
             );
             if (sortingResult.Moved.Count > 0)
             {
-                outputService.WriteLine($"  Result: {sortingResult.Moved.Count} files moved.");
-                outputService.WriteLine();
+                outputService.WriteLine(
+                    $"  Result: {sortingResult.Moved.Count} files moved.",
+                    OutputLevel.Info
+                );
+                outputService.WriteLine(string.Empty, OutputLevel.Info);
             }
             else if (sortingResult.Duplicates.Count > 0)
             {
-                outputService.WriteLine("  Result: All files are already organised.");
-                outputService.WriteLine();
+                outputService.WriteLine(
+                    "  Result: All files are already organised.",
+                    OutputLevel.Info
+                );
+                outputService.WriteLine(string.Empty, OutputLevel.Info);
             }
 
             LogSorting(sortingResult);
@@ -148,7 +155,8 @@ public class IdentifyAndSortNewMediaProcessor(
                 new("Log file:", outputService.LogFileName),
                 new("Extensions:", string.Join(", ", allExtensions)),
                 new("Folder format:", options.Value.FolderNameFormat),
-            ]
+            ],
+            OutputLevel.Info
         );
     }
 
@@ -192,7 +200,8 @@ public class IdentifyAndSortNewMediaProcessor(
                 new("Unsupported:", unsupportedCount.ToString()),
                 new("Alerts:", alerts.Count.ToString(), alerts.Count > 0),
                 new("Errors:", identificationErrorCount.ToString(), identificationErrorCount > 0),
-            ]
+            ],
+            OutputLevel.Info
         );
 
         if (alerts.Count > 0)
@@ -256,10 +265,15 @@ public class IdentifyAndSortNewMediaProcessor(
         if (duplicates.Count == 0)
             return;
 
-        if (!outputService.Confirm($"Action: Delete {duplicates.Count} exact duplicates?"))
+        if (
+            !outputService.Confirm(
+                $"Action: Delete {duplicates.Count} exact duplicates?",
+                OutputLevel.Info
+            )
+        )
         {
-            outputService.WriteLine("  Duplicate cleanup aborted.");
-            outputService.WriteLine();
+            outputService.WriteLine("  Duplicate cleanup aborted.", OutputLevel.Info);
+            outputService.WriteLine(string.Empty, OutputLevel.Info);
             return;
         }
 
@@ -291,8 +305,11 @@ public class IdentifyAndSortNewMediaProcessor(
             }
         );
 
-        outputService.WriteLine($"  Result: Deleted {deletedFiles.Count} file(s).");
-        outputService.WriteLine();
+        outputService.WriteLine(
+            $"  Result: Deleted {deletedFiles.Count} file(s).",
+            OutputLevel.Info
+        );
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
 
         if (deletedFiles.Count != 0)
         {
@@ -385,9 +402,14 @@ public class IdentifyAndSortNewMediaProcessor(
         );
         outputService.WriteLine(string.Empty, OutputLevel.Debug);
 
-        if (!outputService.Confirm($"Action: Delete {foldersToDeleteList.Count} empty folder(s)?"))
+        if (
+            !outputService.Confirm(
+                $"Action: Delete {foldersToDeleteList.Count} empty folder(s)?",
+                OutputLevel.Info
+            )
+        )
         {
-            outputService.WriteLine("  Folder cleanup aborted.");
+            outputService.WriteLine("  Folder cleanup aborted.", OutputLevel.Info);
             return;
         }
 
@@ -419,8 +441,11 @@ public class IdentifyAndSortNewMediaProcessor(
             }
         );
 
-        outputService.WriteLine($"  Result: Deleted {deletedFolders.Count} folder(s).");
-        outputService.WriteLine();
+        outputService.WriteLine(
+            $"  Result: Deleted {deletedFolders.Count} folder(s).",
+            OutputLevel.Info
+        );
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
 
         if (deletedFolders.Count > 0)
         {

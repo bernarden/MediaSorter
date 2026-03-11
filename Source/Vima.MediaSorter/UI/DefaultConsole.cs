@@ -7,56 +7,36 @@ public interface IConsole
 {
     bool IsOutputRedirected { get; }
 
-    void Write(string? value);
-    void WriteLine(string? value = null);
-
     ConsoleKeyInfo ReadKey(bool intercept);
     string? ReadLine();
 
-    void SetColor(OutputLevel level);
-    void ResetColor();
+    void Write(string? value, OutputLevel level);
+    void WriteLine(string? value, OutputLevel level);
 
     void ClearCurrentLine();
-    void RewriteLine(string value);
+    void RewriteLine(string value, OutputLevel level);
 }
 
 public class DefaultConsole : IConsole
 {
+    private OutputLevel _currentLevel = OutputLevel.Info;
+
     public bool IsOutputRedirected => Console.IsOutputRedirected;
-
-    public void Write(string? value) => Console.Write(value);
-
-    public void WriteLine(string? value = null) => Console.WriteLine(value);
 
     public ConsoleKeyInfo ReadKey(bool intercept) => Console.ReadKey(intercept);
 
     public string? ReadLine() => Console.ReadLine();
 
-    public void SetColor(OutputLevel level)
+    public void Write(string? value, OutputLevel level)
     {
-        if (IsOutputRedirected)
-            return;
-
-        switch (level)
-        {
-            case OutputLevel.Warn:
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                break;
-            case OutputLevel.Error:
-                Console.ForegroundColor = ConsoleColor.Red;
-                break;
-            case OutputLevel.Debug:
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                break;
-        }
+        SetColor(level);
+        Console.Write(value);
     }
 
-    public void ResetColor()
+    public void WriteLine(string? value, OutputLevel level)
     {
-        if (IsOutputRedirected)
-            return;
-
-        Console.ResetColor();
+        SetColor(level);
+        Console.WriteLine(value);
     }
 
     public void ClearCurrentLine()
@@ -70,13 +50,36 @@ public class DefaultConsole : IConsole
         Console.SetCursorPosition(0, currentLineCursor);
     }
 
-    public void RewriteLine(string value)
+    public void RewriteLine(string value, OutputLevel level)
     {
         if (IsOutputRedirected)
             return;
 
         Console.SetCursorPosition(0, Console.CursorTop - 1);
         ClearCurrentLine();
-        Console.WriteLine(value);
+        WriteLine(value, level);
+    }
+
+    private void SetColor(OutputLevel level)
+    {
+        if (IsOutputRedirected || _currentLevel == level)
+            return;
+
+        _currentLevel = level;
+        switch (level)
+        {
+            case OutputLevel.Warn:
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                break;
+            case OutputLevel.Error:
+                Console.ForegroundColor = ConsoleColor.Red;
+                break;
+            case OutputLevel.Debug:
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                break;
+            case OutputLevel.Info:
+                Console.ResetColor();
+                break;
+        }
     }
 }

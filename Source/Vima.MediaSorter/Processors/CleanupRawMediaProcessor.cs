@@ -28,7 +28,7 @@ public class CleanupRawMediaProcessor(
         {
             OutputConfiguration();
 
-            outputService.Section("[Step 1/2] Identification");
+            outputService.Section("[Step 1/2] Identification", OutputLevel.Info);
 
             var structure = outputService.ExecuteWithProgress(
                 "Scanning directories",
@@ -39,7 +39,7 @@ public class CleanupRawMediaProcessor(
 
             ReportAnalysisResults(structure, deletionPlan);
 
-            outputService.Section("[Step 2/2] Deletion");
+            outputService.Section("[Step 2/2] Deletion", OutputLevel.Info);
 
             int totalOrphanedCount = deletionPlan.Sum(p => p.Value.Count);
             if (totalOrphanedCount == 0)
@@ -49,7 +49,10 @@ public class CleanupRawMediaProcessor(
             }
 
             if (
-                !outputService.Confirm($"Action: Delete {totalOrphanedCount} orphaned RAW file(s)?")
+                !outputService.Confirm(
+                    $"Action: Delete {totalOrphanedCount} orphaned RAW file(s)?",
+                    OutputLevel.Info
+                )
             )
             {
                 outputService.Complete("  Operation aborted.");
@@ -75,7 +78,8 @@ public class CleanupRawMediaProcessor(
                 new("Log file:", outputService.LogFileName),
                 new("Raw folder:", MediaSorterConstants.RawFolderName),
                 new("Raw extensions:", string.Join(", ", rawExtensions)),
-            ]
+            ],
+            OutputLevel.Info
         );
     }
 
@@ -90,7 +94,8 @@ public class CleanupRawMediaProcessor(
             [
                 new("Folders checked:", structure.SortedFolders.Count.ToString()),
                 new("Orphaned RAWs:", orphanedCount.ToString()),
-            ]
+            ],
+            OutputLevel.Info
         );
 
         if (plan.Count != 0)
@@ -175,8 +180,8 @@ public class CleanupRawMediaProcessor(
             }
         );
 
-        outputService.WriteLine($"  Result: Deleted {deleted} file(s).");
-        outputService.WriteLine();
+        outputService.WriteLine($"  Result: Deleted {deleted} file(s).", OutputLevel.Info);
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
 
         if (deleteDetails.Count > 0)
         {

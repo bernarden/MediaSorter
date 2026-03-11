@@ -72,7 +72,7 @@ public class FindDuplicatesProcessor(
 
             var (visualHasher, threshold) = SelectVisualHasher();
 
-            outputService.Section("[Step 1/1] Duplicate Detection");
+            outputService.Section("[Step 1/1] Duplicate Detection", OutputLevel.Info);
             Stopwatch sw = Stopwatch.StartNew();
 
             var (hashes, errors) = GenerateHashes(allFiles);
@@ -108,7 +108,7 @@ public class FindDuplicatesProcessor(
         }
         catch (Exception ex)
         {
-            outputService.Fatal("A critical error occurred.", ex);
+            outputService.Fatal("A critical error occurred during processing.", ex);
         }
     }
 
@@ -120,7 +120,8 @@ public class FindDuplicatesProcessor(
                 new("Directory:", options.Value.Directory),
                 new("Log file:", outputService.LogFileName),
                 new("Binary hasher:", fileHasher.GetType().Name),
-            ]
+            ],
+            OutputLevel.Info
         );
     }
 
@@ -149,7 +150,8 @@ public class FindDuplicatesProcessor(
                 new("  Exact:", exactRedundant.ToString()),
                 new("  Visual:", visualRedundant.ToString()),
                 new("Errors:", errors.Count.ToString(), !errors.IsEmpty),
-            ]
+            ],
+            OutputLevel.Info
         );
 
         LogDuplicateGroups("Exact duplicates (byte-for-byte)", exactDuplicates, hashes);
@@ -377,27 +379,33 @@ public class FindDuplicatesProcessor(
 
     private (IVisualFileHasher? visualHasher, int threshold) SelectVisualHasher()
     {
-        outputService.WriteLine("Duplicate detection modes:");
+        outputService.WriteLine("Duplicate detection modes:", OutputLevel.Info);
         outputService.WriteLine(
-            "  [0] Exact (default): Byte-for-byte match. Fastest; misses resized/edited images."
+            "  [0] Exact (default): Byte-for-byte match. Fastest; misses resized/edited images.",
+            OutputLevel.Info
         );
         outputService.WriteLine(
-            $"  [{(int)VisualHasherType.Average}] Average: High speed. Best for near-identical copies."
+            $"  [{(int)VisualHasherType.Average}] Average: High speed. Best for near-identical copies.",
+            OutputLevel.Info
         );
         outputService.WriteLine(
-            $"  [{(int)VisualHasherType.Difference}] Difference: Balanced. Great for finding resized/compressed versions."
+            $"  [{(int)VisualHasherType.Difference}] Difference: Balanced. Great for finding resized/compressed versions.",
+            OutputLevel.Info
         );
         outputService.WriteLine(
-            $"  [{(int)VisualHasherType.Perceptual}] Perceptual: High precision. Finds matches even if filtered/edited."
+            $"  [{(int)VisualHasherType.Perceptual}] Perceptual: High precision. Finds matches even if filtered/edited.",
+            OutputLevel.Info
         );
         outputService.WriteLine(
-            $"Note: Visual modes only apply to: {string.Join(", ", ImageExtensions)}"
+            $"Note: Visual modes only apply to: {string.Join(", ", ImageExtensions)}",
+            OutputLevel.Info
         );
-        outputService.WriteLine();
-        var choice = (VisualHasherType)outputService.PromptForInt("Select mode", 0, 0, 3);
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
+        var choice = (VisualHasherType)
+            outputService.PromptForInt("Select mode", 0, 0, 3, OutputLevel.Info);
         if ((int)choice == 0)
         {
-            outputService.WriteLine();
+            outputService.WriteLine(string.Empty, OutputLevel.Info);
             return (null, 0);
         }
 
@@ -408,7 +416,7 @@ public class FindDuplicatesProcessor(
                 $"  Hasher {choice} not registered. Defaulting to Exact.",
                 OutputLevel.Warn
             );
-            outputService.WriteLine();
+            outputService.WriteLine(string.Empty, OutputLevel.Warn);
             return (null, 0);
         }
 
@@ -417,10 +425,11 @@ public class FindDuplicatesProcessor(
             $"Threshold 0-64 (match:0, default:{recommended}, loose:15)",
             recommended,
             0,
-            64
+            64,
+            OutputLevel.Info
         );
 
-        outputService.WriteLine();
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
         return (selectedHasher, Math.Clamp(threshold, 0, 64));
     }
 
@@ -429,7 +438,12 @@ public class FindDuplicatesProcessor(
         ConcurrentDictionary<string, FindDuplicatesFile> hashes
     )
     {
-        if (!outputService.Confirm("Action: Interactively review duplicate groups one by one?"))
+        if (
+            !outputService.Confirm(
+                "Action: Interactively review duplicate groups one by one?",
+                OutputLevel.Info
+            )
+        )
         {
             outputService.Complete("  Operation aborted.");
             return;
@@ -439,8 +453,11 @@ public class FindDuplicatesProcessor(
 
         for (int i = 0; i < groups.Count; i++)
         {
-            outputService.WriteLine();
-            outputService.WriteLine($"Group {i + 1}/{groups.Count} ({groups[i].Count} files)");
+            outputService.WriteLine(string.Empty, OutputLevel.Info);
+            outputService.WriteLine(
+                $"Group {i + 1}/{groups.Count} ({groups[i].Count} files)",
+                OutputLevel.Info
+            );
 
             var sortedGroup = groups[i]
                 .OrderByDescending(path => hashes[path].Width * hashes[path].Height)
@@ -452,12 +469,13 @@ public class FindDuplicatesProcessor(
                     hashes[path].Width > 0 ? $"{hashes[path].Width}x{hashes[path].Height}" : "N/A";
                 string relativePath = fileSystem.GetRelativePath(path);
                 outputService.WriteLine(
-                    $"  - {relativePath} [{resolution} | {FormatFileSize(hashes[path].Size)}]"
+                    $"  - {relativePath} [{resolution} | {FormatFileSize(hashes[path].Size)}]",
+                    OutputLevel.Info
                 );
             }
 
             bool moveToNext = false;
-            outputService.Write(menuPrompt);
+            outputService.Write(menuPrompt, OutputLevel.Info);
             while (!moveToNext)
             {
                 var input = outputService.ReadKey(true);
@@ -467,19 +485,19 @@ public class FindDuplicatesProcessor(
                         OpenGroupFiles(sortedGroup, menuPrompt);
                         break;
                     case ConsoleKey.N:
-                        outputService.WriteLine(input.ToString());
+                        outputService.WriteLine(input.ToString(), OutputLevel.Info);
                         moveToNext = true;
                         break;
                     case ConsoleKey.Q:
-                        outputService.WriteLine(input.ToString());
-                        outputService.WriteLine();
+                        outputService.WriteLine(input.ToString(), OutputLevel.Info);
+                        outputService.WriteLine(string.Empty, OutputLevel.Info);
                         outputService.Complete();
                         return;
                 }
             }
         }
 
-        outputService.WriteLine();
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
         outputService.Complete();
     }
 
@@ -550,16 +568,18 @@ public class FindDuplicatesProcessor(
 
     private string? SelectTargetFolder(List<string> allFiles)
     {
-        outputService.WriteLine("Duplicate search scopes:");
+        outputService.WriteLine("Duplicate search scopes:", OutputLevel.Info);
         outputService.WriteLine(
-            "  [0] Global (default): Compare every file against every other file."
+            "  [0] Global (default): Compare every file against every other file.",
+            OutputLevel.Info
         );
         outputService.WriteLine(
-            "  [1] Targeted: Select one folder and find where its files are duplicated."
+            "  [1] Targeted: Select one folder and find where its files are duplicated.",
+            OutputLevel.Info
         );
-        outputService.WriteLine();
-        var mode = outputService.PromptForInt("Select search scope", 0, 0, 1);
-        outputService.WriteLine();
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
+        var mode = outputService.PromptForInt("Select search scope", 0, 0, 1, OutputLevel.Info);
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
 
         if (mode == 0)
             return null;
@@ -580,10 +600,16 @@ public class FindDuplicatesProcessor(
                 return $"{prefix} {displayPath}";
             }
         );
-        outputService.List("Target folders:", folderOptions);
+        outputService.List("Target folders:", folderOptions, OutputLevel.Info);
 
-        int choice = outputService.PromptForInt("Select folder index", 0, 0, folders.Count - 1);
-        outputService.WriteLine();
+        int choice = outputService.PromptForInt(
+            "Select folder index",
+            0,
+            0,
+            folders.Count - 1,
+            OutputLevel.Info
+        );
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
         return folders[choice];
     }
 
@@ -602,17 +628,20 @@ public class FindDuplicatesProcessor(
             catch (Exception ex)
             {
                 if (!errorOccurred)
-                    outputService.WriteLine();
+                    outputService.WriteLine(string.Empty, OutputLevel.Info);
 
                 errorOccurred = true;
                 string relative = fileSystem.GetRelativePath(path);
-                outputService.WriteLine($"(!) Failed to open {relative}: {ex.Message}");
+                outputService.WriteLine(
+                    $"(!) Failed to open {relative}: {ex.Message}",
+                    OutputLevel.Warn
+                );
             }
         }
 
         if (errorOccurred)
         {
-            outputService.Write(prompt);
+            outputService.Write(prompt, OutputLevel.Info);
         }
     }
 

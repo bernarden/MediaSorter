@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using System.Threading;
+using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.UI;
 
@@ -16,15 +17,17 @@ public class ProgressBar : IDisposable, IProgress<double>
 
     private readonly Timer _timer;
     private readonly IConsole _console;
+    private readonly OutputLevel _outputLevel;
 
     private double _currentProgress;
     private string _currentText = string.Empty;
     private bool _disposed;
     private int _animationIndex;
 
-    public ProgressBar(IConsole console)
+    public ProgressBar(IConsole console, OutputLevel outputLevel)
     {
         _console = console;
+        _outputLevel = outputLevel;
         _timer = new(TimerHandler);
 
         // A progress bar is only for temporary display in a console window.
@@ -93,7 +96,7 @@ public class ProgressBar : IDisposable, IProgress<double>
             outputBuilder.Append('\b', overlapCount);
         }
 
-        _console.Write(outputBuilder.ToString());
+        _console.Write(outputBuilder.ToString(), _outputLevel);
         _currentText = text;
     }
 
