@@ -13,43 +13,30 @@ namespace Vima.MediaSorter.Services;
 
 public interface IOutputService
 {
-    public void Initialize();
     public string LogFileName { get; }
+    public void Initialize();
 
     string Start(string processorName);
     void Complete(string message = "");
     void Fatal(string context, Exception ex);
 
-    void Header(string title, OutputLevel level = OutputLevel.Info);
-    void Section(string title, OutputLevel level = OutputLevel.Info);
-    void Subsection(string title, OutputLevel level = OutputLevel.Info);
-    void Table(
-        string title,
-        IEnumerable<OutputTableRow> items,
-        OutputLevel level = OutputLevel.Info
-    );
-    void List(
-        string title,
-        IEnumerable<string> items,
-        OutputLevel level = OutputLevel.Info,
-        int? maxItems = null
-    );
+    void Header(string title, OutputLevel level);
+    void Section(string title, OutputLevel level);
+    void Subsection(string title, OutputLevel level);
 
-    bool Confirm(string question, ConsoleKey defaultAnswer = ConsoleKey.N);
-    int PromptForInt(
-        string prompt,
-        int defaultValue,
-        int min = int.MinValue,
-        int max = int.MaxValue
-    );
+    void Table(string title, IEnumerable<OutputTableRow> items, OutputLevel level);
+    void List(string title, IEnumerable<string> items, OutputLevel level, int? maxItems = null);
+
+    bool Confirm(string question, OutputLevel level, ConsoleKey defaultAnswer = ConsoleKey.N);
+    int PromptForInt(string prompt, int defaultValue, int min, int max, OutputLevel level);
     TimeSpan GetVideoUtcOffsetFromUser();
+
     ConsoleKey ReadKey(bool intercept = true);
     string? ReadLine();
+    void Write(string message, OutputLevel level);
+    void WriteLine(string message, OutputLevel level);
 
     T ExecuteWithProgress<T>(string label, Func<IProgress<double>, T> action);
-
-    void WriteLine(string? message = null, OutputLevel level = OutputLevel.Info);
-    void Write(string message, OutputLevel level = OutputLevel.Info);
 }
 
 public class OutputService(IConsole console, IOptions<MediaSorterOptions> options)
@@ -108,7 +95,10 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
             }
             catch (Exception ex)
             {
-                _console.WriteLine($"Warning: Could not initialize log file. {ex.Message}");
+                _console.WriteLine(
+                    $"Warning: Could not initialize log file. {ex.Message}",
+                    OutputLevel.Error
+                );
                 _logFileStream = null;
                 _logStreamWriter = null;
             }
@@ -117,43 +107,58 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
 
     public string Start(string processorName)
     {
-        WriteLine();
-        Header($"Executing: {processorName}");
+        WriteLine(string.Empty, OutputLevel.Info);
+        Header($"Executing: {processorName}", OutputLevel.Info);
         return LogFileName;
     }
 
-    public void Header(string title, OutputLevel level = OutputLevel.Info)
+    public void Complete(string message = "")
     {
-        _console.SetColor(level);
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            WriteLine(message, OutputLevel.Info);
+            WriteLine(string.Empty, OutputLevel.Info);
+        }
+
+        WriteLine(MediaSorterConstants.Separator, OutputLevel.Info);
+        WriteLine(string.Empty, OutputLevel.Info);
+    }
+
+    public void Fatal(string context, Exception ex)
+    {
+        WriteLine(string.Empty, OutputLevel.Error);
+        WriteLine(context, OutputLevel.Error);
+        WriteLine($"Message: {ex.Message}", OutputLevel.Error);
+        WriteLine($"Stack: {ex.StackTrace}", OutputLevel.Error);
+        WriteLine($"Details logged to: {LogFileName}", OutputLevel.Error);
+        WriteLine(string.Empty, OutputLevel.Error);
+
+        WriteLine(MediaSorterConstants.Separator, OutputLevel.Info);
+        WriteLine(string.Empty, OutputLevel.Info);
+    }
+
+    public void Header(string title, OutputLevel level)
+    {
         WriteLine(MediaSorterConstants.Separator, level);
         WriteLine(title, level);
         WriteLine(MediaSorterConstants.Separator, level);
-        _console.ResetColor();
     }
 
-    public void Section(string title, OutputLevel level = OutputLevel.Info)
+    public void Section(string title, OutputLevel level)
     {
-        _console.SetColor(level);
         WriteLine(MediaSorterConstants.TaskSeparator, level);
         WriteLine(title, level);
         WriteLine(MediaSorterConstants.TaskSeparator, level);
-        _console.ResetColor();
     }
 
-    public void Subsection(string title, OutputLevel level = OutputLevel.Info)
+    public void Subsection(string title, OutputLevel level)
     {
-        _console.SetColor(level);
         WriteLine(MediaSorterConstants.SubTaskSeparator, level);
         WriteLine($"> {title}", level);
         WriteLine(MediaSorterConstants.SubTaskSeparator, level);
-        _console.ResetColor();
     }
 
-    public void Table(
-        string title,
-        IEnumerable<OutputTableRow> items,
-        OutputLevel level = OutputLevel.Info
-    )
+    public void Table(string title, IEnumerable<OutputTableRow> items, OutputLevel level)
     {
         var visibleItems = items.Where(i => i.Condition).ToList();
         if (visibleItems.Count == 0)
@@ -170,21 +175,19 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
             WriteLine($"  {item.Key.PadRight(maxKeyLength)} {item.Value}", level);
         }
 
-        WriteLine(level: level);
+        WriteLine(string.Empty, level);
     }
 
     public void List(
         string title,
         IEnumerable<string> items,
-        OutputLevel level = OutputLevel.Info,
+        OutputLevel level,
         int? maxItems = null
     )
     {
         var itemList = items.ToList();
         if (itemList.Count == 0)
             return;
-
-        _console.SetColor(level);
 
         if (!string.IsNullOrWhiteSpace(title))
         {
@@ -200,17 +203,16 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         if (maxItems.HasValue && itemList.Count > maxItems.Value)
         {
             int remainingCount = itemList.Count - maxItems.Value;
-            _console.WriteLine($"  ... (see logs for {remainingCount} more)");
+            _console.WriteLine($"  ... (see logs for {remainingCount} more)", level);
 
             foreach (var item in itemList.Skip(maxItems.Value))
             {
                 LogToFile($"  {item}", level);
             }
         }
-        _console.ResetColor();
     }
 
-    public bool Confirm(string question, ConsoleKey defaultAnswer = ConsoleKey.N)
+    public bool Confirm(string question, OutputLevel level, ConsoleKey defaultAnswer = ConsoleKey.N)
     {
         ConsoleKey response;
         char displayChar;
@@ -219,7 +221,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
 
         while (true)
         {
-            _console.Write(questionWithDefault);
+            _console.Write(questionWithDefault, level);
             ConsoleKeyInfo keyInfo = _console.ReadKey(true);
 
             if (keyInfo.Key is ConsoleKey.Y or ConsoleKey.N or ConsoleKey.Enter)
@@ -230,79 +232,31 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
                         ? (defaultAnswer == ConsoleKey.Y ? 'y' : 'n')
                         : keyInfo.KeyChar;
 
-                _console.WriteLine(displayChar.ToString());
+                _console.WriteLine(displayChar.ToString(), level);
                 break;
             }
-            _console.WriteLine(keyInfo.KeyChar.ToString());
+            _console.WriteLine(keyInfo.KeyChar.ToString(), level);
         }
 
-        LogToFile($"{questionWithDefault}{displayChar}", OutputLevel.Info);
+        LogToFile($"{questionWithDefault}{displayChar}", level);
         return response == ConsoleKey.Y;
     }
 
-    public void Complete(string message = "")
-    {
-        if (!string.IsNullOrWhiteSpace(message))
-        {
-            WriteLine(message);
-            WriteLine();
-        }
-
-        WriteLine(MediaSorterConstants.Separator);
-        WriteLine();
-    }
-
-    public void Fatal(string context, Exception ex)
-    {
-        _console.SetColor(OutputLevel.Error);
-        WriteLine($"\n[FATAL ERROR] {context}", OutputLevel.Error);
-        WriteLine($"Message: {ex.Message}", OutputLevel.Error);
-        WriteLine($"Stack: {ex.StackTrace}", OutputLevel.Error);
-        WriteLine($"Details logged to: {LogFileName}", OutputLevel.Error);
-        _console.ResetColor();
-
-        LogToFile(
-            $"[!] FATAL ERROR: {context}\n    Message: {ex.Message}\n    Stack: {ex.StackTrace}",
-            OutputLevel.Error
-        );
-    }
-
-    public T ExecuteWithProgress<T>(string label, Func<IProgress<double>, T> action)
-    {
-        _console.Write($"{label}... ");
-        var sw = Stopwatch.StartNew();
-        T result;
-        using (var progress = new ProgressBar(_console))
-        {
-            result = action(new Progress<double>(progress.Report));
-        }
-        sw.Stop();
-        var duration = $"{sw.Elapsed.TotalSeconds:N1}s";
-        _console.WriteLine($"Done ({duration}).");
-        LogToFile($"{label}... Done ({duration}).", OutputLevel.Info);
-        return result;
-    }
-
-    public int PromptForInt(
-        string prompt,
-        int defaultValue,
-        int min = int.MinValue,
-        int max = int.MaxValue
-    )
+    public int PromptForInt(string prompt, int defaultValue, int min, int max, OutputLevel level)
     {
         int result;
         string formattedPrompt = $"{prompt}: ";
 
         while (true)
         {
-            _console.Write(formattedPrompt);
+            _console.Write(formattedPrompt, OutputLevel.Info);
             string? input = _console.ReadLine()?.Trim();
             bool isDefault = string.IsNullOrEmpty(input);
 
             if (isDefault)
             {
                 result = defaultValue;
-                _console.RewriteLine($"{formattedPrompt}{result}");
+                _console.RewriteLine($"{formattedPrompt}{result}", OutputLevel.Info);
                 break;
             }
 
@@ -336,7 +290,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
             ConsoleKeyInfo keyInfo = _console.ReadKey(true);
             if (keyInfo.Key == ConsoleKey.Enter)
             {
-                _console.WriteLine();
+                _console.WriteLine(string.Empty, OutputLevel.Info);
                 break;
             }
 
@@ -393,28 +347,13 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         void DisplayOffset()
         {
             _console.ClearCurrentLine();
-            _console.Write($"UTC offset for media files: {offset}");
+            _console.Write($"UTC offset for media files: {offset}", OutputLevel.Info);
         }
     }
 
-    public void WriteLine(string? message = null, OutputLevel level = OutputLevel.Info)
+    public ConsoleKey ReadKey(bool intercept = true)
     {
-        if (level != OutputLevel.Debug)
-        {
-            _console.WriteLine(message);
-        }
-
-        LogToFile(message ?? string.Empty, level);
-    }
-
-    public void Write(string message, OutputLevel level = OutputLevel.Info)
-    {
-        if (level != OutputLevel.Debug)
-        {
-            _console.Write(message);
-        }
-
-        LogToFile(message, level, false);
+        return _console.ReadKey(intercept).Key;
     }
 
     public string? ReadLine()
@@ -422,9 +361,40 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         return _console.ReadLine();
     }
 
-    public ConsoleKey ReadKey(bool intercept = true)
+    public void Write(string message, OutputLevel level)
     {
-        return _console.ReadKey(intercept).Key;
+        if (level != OutputLevel.Debug)
+        {
+            _console.Write(message, level);
+        }
+
+        LogToFile(message, level, false);
+    }
+
+    public void WriteLine(string message, OutputLevel level)
+    {
+        if (level != OutputLevel.Debug)
+        {
+            _console.WriteLine(message, level);
+        }
+
+        LogToFile(message ?? string.Empty, level);
+    }
+
+    public T ExecuteWithProgress<T>(string label, Func<IProgress<double>, T> action)
+    {
+        _console.Write($"{label}... ", OutputLevel.Info);
+        var sw = Stopwatch.StartNew();
+        T result;
+        using (var progress = new ProgressBar(_console, OutputLevel.Info))
+        {
+            result = action(new Progress<double>(progress.Report));
+        }
+        sw.Stop();
+        var duration = $"{sw.Elapsed.TotalSeconds:N1}s";
+        _console.WriteLine($"Done ({duration}).", OutputLevel.Info);
+        LogToFile($"{label}... Done ({duration}).", OutputLevel.Info);
+        return result;
     }
 
     private void LogToFile(string message, OutputLevel level, bool addNewLine = true)

@@ -31,7 +31,7 @@ public class RenameSortedMediaProcessor(
         {
             OutputConfiguration();
 
-            outputService.Section("[Step 1/2] Identification");
+            outputService.Section("[Step 1/2] Identification", OutputLevel.Info);
 
             var directoryStructure = outputService.ExecuteWithProgress(
                 "Identifying directories",
@@ -70,7 +70,7 @@ public class RenameSortedMediaProcessor(
                 timeZoneAdjustedFilePaths.Count
             );
 
-            outputService.Section("[Step 2/2] Renaming");
+            outputService.Section("[Step 2/2] Renaming", OutputLevel.Info);
 
             if (renamePlan.Count == 0)
             {
@@ -78,7 +78,12 @@ public class RenameSortedMediaProcessor(
                 return;
             }
 
-            if (!outputService.Confirm($"Action: Rename {renamePlan.Count} file(s)?"))
+            if (
+                !outputService.Confirm(
+                    $"Action: Rename {renamePlan.Count} file(s)?",
+                    OutputLevel.Info
+                )
+            )
             {
                 outputService.Complete("  Operation aborted.");
                 return;
@@ -109,7 +114,8 @@ public class RenameSortedMediaProcessor(
                 new("Extensions:", string.Join(", ", allExtensions)),
                 new("Default format:", MediaSorterConstants.StandardDateFormat),
                 new("Burst format:", MediaSorterConstants.PrecisionDateFormat),
-            ]
+            ],
+            OutputLevel.Info
         );
     }
 
@@ -138,7 +144,8 @@ public class RenameSortedMediaProcessor(
                     identified.ErroredFiles.Count.ToString(),
                     identified.ErroredFiles.Any()
                 ),
-            ]
+            ],
+            OutputLevel.Info
         );
 
         if (identified.ErroredFiles.Any())
@@ -269,8 +276,8 @@ public class RenameSortedMediaProcessor(
                 return true;
             }
         );
-        outputService.WriteLine($"  Result: {moved.Count} files renamed.");
-        outputService.WriteLine();
+        outputService.WriteLine($"  Result: {moved.Count} files renamed.", OutputLevel.Info);
+        outputService.WriteLine(string.Empty, OutputLevel.Info);
 
         if (moved.Count > 0)
         {
