@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
@@ -24,7 +26,7 @@ public class IdentifyAndSortNewMediaProcessor(
 {
     public ProcessorOptions Option => ProcessorOptions.IdentifyAndSortNewMedia;
 
-    public void Process()
+    public async Task Process(CancellationToken token = default)
     {
         outputService.Start("Identify and sort new media");
 
