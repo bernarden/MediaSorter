@@ -1,9 +1,11 @@
-﻿using Vima.MediaSorter.Domain;
+﻿using System.Threading;
+using System.Threading.Tasks;
+using Vima.MediaSorter.Domain;
 
 namespace Vima.MediaSorter.Processors;
 
 public interface IProcessor
 {
     ProcessorOptions Option { get; }
-    public void Process();
+    public Task Process(CancellationToken token = default);
 }

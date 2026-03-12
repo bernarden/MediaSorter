@@ -6,6 +6,7 @@ namespace Vima.MediaSorter.UI;
 public interface IConsole
 {
     bool IsOutputRedirected { get; }
+    event ConsoleCancelEventHandler? CancelKeyPress;
 
     ConsoleKeyInfo ReadKey(bool intercept);
     string? ReadLine();
@@ -22,6 +23,12 @@ public class DefaultConsole : IConsole
     private OutputLevel _currentLevel = OutputLevel.Info;
 
     public bool IsOutputRedirected => Console.IsOutputRedirected;
+
+    public event ConsoleCancelEventHandler? CancelKeyPress
+    {
+        add => Console.CancelKeyPress += value;
+        remove => Console.CancelKeyPress -= value;
+    }
 
     public ConsoleKeyInfo ReadKey(bool intercept) => Console.ReadKey(intercept);
 

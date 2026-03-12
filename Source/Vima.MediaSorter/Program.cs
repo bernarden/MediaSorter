@@ -1,6 +1,7 @@
 using System;
 using System.CommandLine;
 using System.IO;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
@@ -14,7 +15,7 @@ namespace Vima.MediaSorter;
 
 public static class Program
 {
-    public static int Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         Option<string> directoryOption = new("--directory", "-d")
         {
@@ -32,16 +33,16 @@ public static class Program
         rootCommand.Add(directoryOption);
         rootCommand.Add(processorOption);
 
-        rootCommand.SetAction(parseResult =>
+        rootCommand.SetAction(async parseResult =>
         {
             string path = parseResult.GetValue(directoryOption) ?? Directory.GetCurrentDirectory();
             ProcessorOptions option = parseResult.GetValue(processorOption);
             IServiceProvider serviceProvider = ConfigureServices(path);
             var app = serviceProvider.GetRequiredService<IAppOrchestrator>();
-            return app.Run(option);
+            return await app.Run(option);
         });
 
-        return rootCommand.Parse(args).Invoke();
+        return await rootCommand.Parse(args).InvokeAsync();
     }
 
     public static IServiceProvider ConfigureServices(string directoryPath)

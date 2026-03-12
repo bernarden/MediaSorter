@@ -2,21 +2,25 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Services;
+using Vima.MediaSorter.UI;
 
 namespace Vima.MediaSorter;
 
 public interface IAppOrchestrator
 {
-    int Run(ProcessorOptions preselectedOption);
+    Task<int> Run(ProcessorOptions preselectedOption);
 }
 
 public class AppOrchestrator(
     IEnumerable<IProcessor> processors,
     IOutputService outputService,
+    IConsole console,
     IOptions<MediaSorterOptions> options
 ) : IAppOrchestrator
 {
@@ -24,8 +28,15 @@ public class AppOrchestrator(
     private const int SuccessExitCode = 0;
     private readonly MediaSorterOptions _options = options.Value;
 
-    public int Run(ProcessorOptions preselectedOption)
+    public async Task<int> Run(ProcessorOptions preselectedOption)
     {
+        using var cts = new CancellationTokenSource();
+        console.CancelKeyPress += (s, e) =>
+        {
+            e.Cancel = true;
+            cts.Cancel();
+        };
+
         try
         {
             outputService.Initialize();
@@ -39,7 +50,7 @@ public class AppOrchestrator(
                     $"Mode: Automatic selection via command-line argument (-p {preselectedOption}).",
                     OutputLevel.Info
                 );
-                return ExecuteByOption(preselectedOption);
+                return await ExecuteByOption(preselectedOption, cts.Token);
             }
 
             while (true)
@@ -48,9 +59,15 @@ public class AppOrchestrator(
                 if (selectedOption == ProcessorOptions.Exit)
                     break;
 
-                ExecuteByOption(selectedOption);
+                await ExecuteByOption(selectedOption, cts.Token);
             }
 
+            return SuccessExitCode;
+        }
+        catch (OperationCanceledException)
+        {
+            outputService.WriteLine("Operation cancelled by user.", OutputLevel.Warn);
+            outputService.WriteLine(string.Empty, OutputLevel.Warn);
             return SuccessExitCode;
         }
         catch (Exception ex)
@@ -84,7 +101,7 @@ public class AppOrchestrator(
         outputService.WriteLine(string.Empty, OutputLevel.Info);
     }
 
-    private int ExecuteByOption(ProcessorOptions option)
+    private async Task<int> ExecuteByOption(ProcessorOptions option, CancellationToken token)
     {
         var processor = processors.FirstOrDefault(p => p.Option == option);
         if (processor == null)
@@ -96,7 +113,7 @@ public class AppOrchestrator(
             return ErrorExitCode;
         }
 
-        processor.Process();
+        await processor.Process(token);
         return SuccessExitCode;
     }
 

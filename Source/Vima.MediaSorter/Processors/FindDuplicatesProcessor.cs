@@ -52,7 +52,7 @@ public class FindDuplicatesProcessor(
 
     public ProcessorOptions Option => ProcessorOptions.FindDuplicates;
 
-    public void Process()
+    public async Task Process(CancellationToken token = default)
     {
         outputService.Start("Find duplicates");
 
