@@ -44,7 +44,7 @@ public class FileMover(IFileSystem fileSystem, IDuplicateDetector duplicateDetec
 
             try
             {
-                fileSystem.Move(sourceFilePath, targetPath);
+                fileSystem.MoveFile(sourceFilePath, targetPath);
                 return new SuccessfulFileMove(sourceFilePath, targetPath);
             }
             catch (IOException ex) when (IsTransient(ex) && attempt < maxRetries - 1)

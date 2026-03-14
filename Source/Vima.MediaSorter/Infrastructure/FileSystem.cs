@@ -25,7 +25,7 @@ public interface IFileSystem
     void CreateDirectory(string path);
     void DeleteFile(string path);
     void DeleteDirectory(string path, bool recursive = false);
-    void Move(string source, string destination);
+    void MoveFile(string source, string destination);
     FileStream CreateFileStream(
         string path,
         FileMode mode,
@@ -86,7 +86,7 @@ public class FileSystem(IOptions<MediaSorterOptions> options) : IFileSystem
         Directory.Delete(path, recursive);
     }
 
-    public void Move(string source, string destination)
+    public void MoveFile(string source, string destination)
     {
         File.Move(source, destination);
     }
