@@ -36,6 +36,7 @@ public interface IOutputService
     void Write(string message, OutputLevel level);
     void WriteLine(string message, OutputLevel level);
 
+    void ExecuteWithProgress(string label, Action<IProgress<double>> action);
     T ExecuteWithProgress<T>(string label, Func<IProgress<double>, T> action);
 }
 
@@ -395,6 +396,18 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         _console.WriteLine($"Done ({duration}).", OutputLevel.Info);
         LogToFile($"{label}... Done ({duration}).", OutputLevel.Info);
         return result;
+    }
+
+    public void ExecuteWithProgress(string label, Action<IProgress<double>> action)
+    {
+        ExecuteWithProgress<bool>(
+            label,
+            p =>
+            {
+                action(p);
+                return true;
+            }
+        );
     }
 
     private void LogToFile(string message, OutputLevel level, bool addNewLine = true)

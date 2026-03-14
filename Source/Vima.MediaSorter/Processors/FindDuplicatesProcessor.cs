@@ -7,6 +7,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using SkiaSharp;
@@ -25,7 +26,6 @@ public class FindDuplicatesProcessor(
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
-    private readonly Lock CacheFileSaveLock = new();
     private readonly string cacheFilePath = Path.Combine(
         options.Value.Directory,
         "Vima.MediaSorter.Hashes.jsonl"
@@ -75,7 +75,7 @@ public class FindDuplicatesProcessor(
             outputService.Section("[Step 1/1] Duplicate Detection", OutputLevel.Info);
             Stopwatch sw = Stopwatch.StartNew();
 
-            var (hashes, errors) = GenerateHashes(allFiles);
+            var (hashes, errors) = await GenerateHashes(allFiles);
 
             var (exactDuplicates, visualDuplicates) = ClusterDuplicates(
                 visualHasher,
@@ -204,17 +204,19 @@ public class FindDuplicatesProcessor(
         }
     }
 
-    private (
+    private async Task<(
         ConcurrentDictionary<string, FindDuplicatesFile> hashes,
         ConcurrentBag<(string Path, Exception Ex)> errors
-    ) GenerateHashes(List<string> allFiles)
+    )> GenerateHashes(List<string> allFiles)
     {
         var cache = LoadCache();
-
         var results = new ConcurrentDictionary<string, FindDuplicatesFile>();
         var errors = new ConcurrentBag<(string Path, Exception Ex)>();
 
-        return outputService.ExecuteWithProgress(
+        string tempCachePath = cacheFilePath + ".tmp";
+        var (channelWriter, writerTask) = StartBackgroundCacheWriter(tempCachePath);
+
+        outputService.ExecuteWithProgress(
             "Generating hashes",
             p =>
             {
@@ -237,15 +239,13 @@ public class FindDuplicatesProcessor(
                             )
                             {
                                 results[path] = cachedEntry;
+                                channelWriter.TryWrite(cachedEntry);
                             }
                             else
                             {
-                                results[path] = CreateCacheEntry(path, fileSize, lastWrite);
-                            }
-
-                            if (processed % 1000 == 0)
-                            {
-                                SaveCache([.. results.Values]);
+                                var file = CreateFindDuplicatesFile(path, fileSize, lastWrite);
+                                channelWriter.TryWrite(file);
+                                results[path] = file;
                             }
                         }
                         catch (Exception ex)
@@ -258,14 +258,84 @@ public class FindDuplicatesProcessor(
                             p.Report((double)current / allFiles.Count);
                     }
                 );
-
-                SaveCache([.. results.Values]);
-                return (results, errors);
             }
         );
+
+        channelWriter.Complete();
+        await writerTask;
+
+        if (fileSystem.FileExists(tempCachePath))
+        {
+            if (fileSystem.FileExists(cacheFilePath))
+                fileSystem.DeleteFile(cacheFilePath);
+
+            fileSystem.MoveFile(tempCachePath, cacheFilePath);
+        }
+
+        return (results, errors);
     }
 
-    private FindDuplicatesFile CreateCacheEntry(string path, long fileSize, DateTime lastWrite)
+    private (ChannelWriter<FindDuplicatesFile> Writer, Task Worker) StartBackgroundCacheWriter(
+        string filePath,
+        int batchSize = 100
+    )
+    {
+        var channel = Channel.CreateUnbounded<FindDuplicatesFile>(
+            new UnboundedChannelOptions { SingleReader = true }
+        );
+
+        var workerTask = Task.Run(async () =>
+        {
+            var batch = new List<FindDuplicatesFile>(batchSize);
+            using var stream = fileSystem.CreateFileStream(
+                filePath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.Read
+            );
+            using var writer = new StreamWriter(stream);
+            await foreach (var entry in channel.Reader.ReadAllAsync())
+            {
+                batch.Add(entry);
+
+                if (batch.Count >= batchSize)
+                {
+                    batch.ForEach(item =>
+                        writer.WriteLine(
+                            JsonSerializer.Serialize(
+                                item,
+                                SourceGenerationContext.Default.FindDuplicatesFile
+                            )
+                        )
+                    );
+                    await writer.FlushAsync();
+                    batch.Clear();
+                }
+            }
+
+            if (batch.Count > 0)
+            {
+                batch.ForEach(item =>
+                    writer.WriteLine(
+                        JsonSerializer.Serialize(
+                            item,
+                            SourceGenerationContext.Default.FindDuplicatesFile
+                        )
+                    )
+                );
+                await writer.FlushAsync();
+                batch.Clear();
+            }
+        });
+
+        return (channel.Writer, workerTask);
+    }
+
+    private FindDuplicatesFile CreateFindDuplicatesFile(
+        string path,
+        long fileSize,
+        DateTime lastWrite
+    )
     {
         string bHash = fileHasher.GetHash(path);
 
@@ -499,27 +569,6 @@ public class FindDuplicatesProcessor(
 
         outputService.WriteLine(string.Empty, OutputLevel.Info);
         outputService.Complete();
-    }
-
-    private void SaveCache(IEnumerable<FindDuplicatesFile> entries)
-    {
-        lock (CacheFileSaveLock)
-        {
-            using var stream = fileSystem.CreateFileStream(
-                cacheFilePath,
-                FileMode.Create,
-                FileAccess.Write
-            );
-            using var writer = new StreamWriter(stream);
-            foreach (var entry in entries)
-            {
-                string entryJson = JsonSerializer.Serialize(
-                    entry,
-                    SourceGenerationContext.Default.FindDuplicatesFile
-                );
-                writer.WriteLine(entryJson);
-            }
-        }
     }
 
     private Dictionary<string, FindDuplicatesFile> LoadCache()

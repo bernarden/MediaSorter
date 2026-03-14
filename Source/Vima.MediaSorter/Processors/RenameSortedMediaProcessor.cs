@@ -266,7 +266,7 @@ public class RenameSortedMediaProcessor(
                     var op = plan[i];
                     try
                     {
-                        fileSystem.Move(op.Source, op.Destination);
+                        fileSystem.MoveFile(op.Source, op.Destination);
                         moved.Add(op);
                     }
                     catch (Exception ex)
