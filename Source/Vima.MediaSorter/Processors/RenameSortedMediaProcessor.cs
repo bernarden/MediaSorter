@@ -153,8 +153,8 @@ public class RenameSortedMediaProcessor(
         if (identified.ErroredFiles.Any())
         {
             var errors = identified
-                .ErroredFiles.OrderBy(e => e.FilePath)
-                .Select(e => $"{fileSystem.GetRelativePath(e.FilePath)}: {e.Exception.Message}");
+                .ErroredFiles.OrderBy(e => e.Path)
+                .Select(e => $"{fileSystem.GetRelativePath(e.Path)}: {e.Exception.Message}");
             outputService.List("Errors:", errors, OutputLevel.Error, 5);
             outputService.WriteLine(string.Empty, OutputLevel.Error);
         }

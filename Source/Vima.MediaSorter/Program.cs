@@ -60,9 +60,10 @@ public static class Program
         services.AddTransient<IProcessor, CleanupRawMediaProcessor>();
 
         services.AddTransient<IDirectoryIdentificationService, DirectoryIdentificationService>();
+        services.AddTransient<IEmptyFolderCleanupService, EmptyFolderCleanupService>();
         services.AddTransient<IMediaIdentificationService, MediaIdentificationService>();
-        services.AddTransient<IRelatedFilesDiscoveryService, RelatedFilesDiscoveryService>();
         services.AddTransient<IMediaSortingService, MediaSortingService>();
+        services.AddTransient<IRelatedFilesDiscoveryService, RelatedFilesDiscoveryService>();
         services.AddTransient<ITimeZoneAdjustmentService, TimeZoneAdjustmentService>();
         services.AddSingleton<IOutputService, OutputService>();
 

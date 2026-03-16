@@ -36,7 +36,7 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         int processedFileCounter = 0;
         ConcurrentBag<MediaFileWithDate> mediaFilesWithDates = new();
         ConcurrentBag<MediaFile> mediaFilesWithoutDates = new();
-        ConcurrentBag<FileIdentificationError> erroredFiles = new();
+        ConcurrentBag<PathError> erroredFiles = new();
         ConcurrentBag<string> unsupportedFiles = new();
         Parallel.ForEach(
             filePaths,
@@ -68,7 +68,7 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         string filePath,
         ConcurrentBag<MediaFileWithDate> mediaFilesWithDates,
         ConcurrentBag<MediaFile> mediaFilesWithoutDates,
-        ConcurrentBag<FileIdentificationError> erroredFiles,
+        ConcurrentBag<PathError> erroredFiles,
         ConcurrentBag<string> unsupportedFiles
     )
     {
@@ -94,7 +94,7 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
         }
         catch (Exception e)
         {
-            erroredFiles.Add(new FileIdentificationError(filePath, e));
+            erroredFiles.Add(new PathError(filePath, e));
         }
     }
 }
