@@ -178,7 +178,6 @@ public class CleanupRawMediaProcessor(
                         p.Report((double)deleted / totalFiles);
                     }
                 }
-                return true;
             }
         );
 

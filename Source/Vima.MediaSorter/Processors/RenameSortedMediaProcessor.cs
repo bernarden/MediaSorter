@@ -275,7 +275,6 @@ public class RenameSortedMediaProcessor(
                     }
                     p.Report((double)(i + 1) / plan.Count);
                 }
-                return true;
             }
         );
         outputService.WriteLine($"  Result: {moved.Count} files renamed.", OutputLevel.Info);

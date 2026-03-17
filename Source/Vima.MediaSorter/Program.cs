@@ -7,6 +7,7 @@ using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Infrastructure.Hashers;
 using Vima.MediaSorter.Processors;
+using Vima.MediaSorter.Processors.IdentifyAndSortNewMedia;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.Services.MediaFileHandlers;
 using Vima.MediaSorter.UI;
@@ -55,6 +56,7 @@ public static class Program
 
         services.AddTransient<IAppOrchestrator, AppOrchestrator>();
         services.AddTransient<IProcessor, IdentifyAndSortNewMediaProcessor>();
+        services.AddTransient<IIdentifyAndSortNewMediaReporter, IdentifyAndSortNewMediaReporter>();
         services.AddTransient<IProcessor, FindDuplicatesProcessor>();
         services.AddTransient<IProcessor, RenameSortedMediaProcessor>();
         services.AddTransient<IProcessor, CleanupRawMediaProcessor>();
