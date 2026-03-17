@@ -13,8 +13,8 @@ using Microsoft.Extensions.Options;
 using SkiaSharp;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
-using Vima.MediaSorter.Infrastructure.Hashers;
 using Vima.MediaSorter.Services;
+using Vima.MediaSorter.Services.Hashers;
 
 namespace Vima.MediaSorter.Processors;
 

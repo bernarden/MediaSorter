@@ -1,8 +1,9 @@
 ﻿using System;
 using System.IO;
 using System.Security.Cryptography;
+using Vima.MediaSorter.Infrastructure;
 
-namespace Vima.MediaSorter.Infrastructure.Hashers;
+namespace Vima.MediaSorter.Services.Hashers;
 
 public interface IFileHasher
 {

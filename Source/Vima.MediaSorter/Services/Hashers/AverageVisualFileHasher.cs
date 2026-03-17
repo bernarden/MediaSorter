@@ -1,7 +1,8 @@
 ﻿using SkiaSharp;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Infrastructure;
 
-namespace Vima.MediaSorter.Infrastructure.Hashers;
+namespace Vima.MediaSorter.Services.Hashers;
 
 public class AverageVisualFileHasher(IFileSystem fileSystem) : VisualFileHasherBase(fileSystem)
 {

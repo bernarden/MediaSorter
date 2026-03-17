@@ -3,15 +3,19 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using Vima.MediaSorter.Domain;
+using Vima.MediaSorter.Infrastructure;
 
-namespace Vima.MediaSorter.Infrastructure;
+namespace Vima.MediaSorter.Services;
 
-public interface IFileMover
+public interface IFileMovingService
 {
     FileMove Move(string sourceFilePath, string targetDirectory, string targetFileName);
 }
 
-public class FileMover(IFileSystem fileSystem, IDuplicateDetector duplicateDetector) : IFileMover
+public class FileMovingService(
+    IFileSystem fileSystem,
+    IExactFileDuplicateDetectingService duplicateDetector
+) : IFileMovingService
 {
     private readonly ConcurrentDictionary<string, bool> _previouslyCreatedFolders = new();
 

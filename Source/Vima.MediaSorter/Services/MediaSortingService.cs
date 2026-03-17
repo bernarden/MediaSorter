@@ -18,8 +18,10 @@ public interface IMediaSortingService
     );
 }
 
-public class MediaSortingService(IFileMover fileMover, IDirectoryResolver directoryResolver)
-    : IMediaSortingService
+public class MediaSortingService(
+    IFileMovingService fileMovingService,
+    IDirectoryResolver directoryResolver
+) : IMediaSortingService
 {
     public SortedMedia Sort(
         IReadOnlyCollection<MediaFileWithDate> files,
@@ -48,7 +50,7 @@ public class MediaSortingService(IFileMover fileMover, IDirectoryResolver direct
                 {
                     try
                     {
-                        FileMove moveResult = fileMover.Move(
+                        FileMove moveResult = fileMovingService.Move(
                             path,
                             targetFolder,
                             Path.GetFileName(path)

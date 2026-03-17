@@ -5,10 +5,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
-using Vima.MediaSorter.Infrastructure.Hashers;
 using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Processors.IdentifyAndSortNewMedia;
 using Vima.MediaSorter.Services;
+using Vima.MediaSorter.Services.Hashers;
 using Vima.MediaSorter.Services.MediaFileHandlers;
 using Vima.MediaSorter.UI;
 
@@ -61,28 +61,31 @@ public static class Program
         services.AddTransient<IProcessor, RenameSortedMediaProcessor>();
         services.AddTransient<IProcessor, CleanupRawMediaProcessor>();
 
+        services.AddSingleton<IOutputService, OutputService>();
         services.AddTransient<IDirectoryIdentificationService, DirectoryIdentificationService>();
         services.AddTransient<IEmptyFolderCleanupService, EmptyFolderCleanupService>();
+        services.AddTransient<
+            IExactFileDuplicateDetectingService,
+            ExactFileDuplicateDetectingService
+        >();
+        services.AddTransient<IFileMovingService, FileMovingService>();
         services.AddTransient<IMediaIdentificationService, MediaIdentificationService>();
         services.AddTransient<IMediaSortingService, MediaSortingService>();
         services.AddTransient<IRelatedFilesDiscoveryService, RelatedFilesDiscoveryService>();
         services.AddTransient<ITimeZoneAdjustmentService, TimeZoneAdjustmentService>();
-        services.AddSingleton<IOutputService, OutputService>();
 
-        services.AddSingleton<IConsole, DefaultConsole>();
+        services.AddSingleton<IFileHasher, Md5FileHasher>();
+        services.AddSingleton<IVisualFileHasher, AverageVisualFileHasher>();
+        services.AddSingleton<IVisualFileHasher, DifferenceVisualFileHasher>();
+        services.AddSingleton<IVisualFileHasher, PerceptualVisualFileHasher>();
 
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Cr3MediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Mp4MediaFileHandler>();
 
-        services.AddTransient<IDuplicateDetector, DuplicateDetector>();
-        services.AddTransient<IFileMover, FileMover>();
         services.AddTransient<IDirectoryResolver, DirectoryResolver>();
         services.AddSingleton<IFileSystem, FileSystem>();
-        services.AddSingleton<IFileHasher, Md5FileHasher>();
-        services.AddSingleton<IVisualFileHasher, AverageVisualFileHasher>();
-        services.AddSingleton<IVisualFileHasher, DifferenceVisualFileHasher>();
-        services.AddSingleton<IVisualFileHasher, PerceptualVisualFileHasher>();
+        services.AddSingleton<IConsole, DefaultConsole>();
 
         return services.BuildServiceProvider();
     }

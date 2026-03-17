@@ -1,13 +1,15 @@
 using System.IO;
+using Vima.MediaSorter.Infrastructure;
 
-namespace Vima.MediaSorter.Infrastructure;
+namespace Vima.MediaSorter.Services;
 
-public interface IDuplicateDetector
+public interface IExactFileDuplicateDetectingService
 {
     bool AreIdentical(string path1, string path2);
 }
 
-public class DuplicateDetector(IFileSystem fileSystem) : IDuplicateDetector
+public class ExactFileDuplicateDetectingService(IFileSystem fileSystem)
+    : IExactFileDuplicateDetectingService
 {
     public bool AreIdentical(string path1, string path2)
     {
