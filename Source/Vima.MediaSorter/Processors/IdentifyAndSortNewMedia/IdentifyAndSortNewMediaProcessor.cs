@@ -18,6 +18,7 @@ public class IdentifyAndSortNewMediaProcessor(
     IMediaSortingService mediaSortingService,
     IRelatedFilesDiscoveryService relatedFileDiscoveryService,
     IEmptyFolderCleanupService emptyFolderCleanupService,
+    IFileRemovingService fileRemovingService,
     IIdentifyAndSortNewMediaReporter identifyAndSortMediaReporter,
     IFileSystem fileSystem,
     IOutputService outputService,
@@ -160,36 +161,14 @@ public class IdentifyAndSortNewMediaProcessor(
             return;
         }
 
-        var deletedFiles = new List<string>();
-        var deletionErrors = new List<(string FilePath, string ExceptionMessage)>();
-
-        outputService.ExecuteWithProgress(
+        var result = outputService.ExecuteWithProgress(
             "  Cleaning up duplicates",
-            p =>
-            {
-                for (int i = 0; i < duplicates.Count; i++)
-                {
-                    var duplicateFile = duplicates[i];
-                    try
-                    {
-                        if (fileSystem.FileExists(duplicateFile.SourcePath))
-                        {
-                            fileSystem.DeleteFile(duplicateFile.SourcePath);
-                            deletedFiles.Add(duplicateFile.SourcePath);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        deletionErrors.Add((duplicateFile.SourcePath, ex.Message));
-                    }
-                    p.Report((double)(i + 1) / duplicates.Count);
-                }
-            }
+            p => fileRemovingService.DeleteFiles(duplicates.Select(d => d.SourcePath), p)
         );
 
         identifyAndSortMediaReporter.ReportDuplicateFileDeletionResults(
-            deletedFiles,
-            deletionErrors
+            result.DeletedFiles,
+            result.ErroredFiles
         );
     }
 
@@ -218,6 +197,9 @@ public class IdentifyAndSortNewMediaProcessor(
             "  Deleting folders",
             p => emptyFolderCleanupService.DeleteFolders(foldersToDelete, p)
         );
-        identifyAndSortMediaReporter.ReportEmptyFolderDeletionResults(result);
+        identifyAndSortMediaReporter.ReportEmptyFolderDeletionResults(
+            result.DeletedFolders,
+            result.ErroredFolders
+        );
     }
 }

@@ -19,10 +19,13 @@ public interface IIdentifyAndSortNewMediaReporter
     );
     void ReportSortingResults(SortedMedia result);
     void ReportDuplicateFileDeletionResults(
-        List<string> deletedFiles,
-        List<(string FilePath, string ExceptionMessage)> deletionErrors
+        IEnumerable<string> deletedFiles,
+        IEnumerable<PathError> deletionErrors
     );
-    void ReportEmptyFolderDeletionResults(EmptyFolderCleanupResult result);
+    void ReportEmptyFolderDeletionResults(
+        IEnumerable<string> deletedFolders,
+        IEnumerable<PathError> deletionErrors
+    );
 }
 
 public class IdentifyAndSortNewMediaReporter(
@@ -186,17 +189,17 @@ public class IdentifyAndSortNewMediaReporter(
     }
 
     public void ReportDuplicateFileDeletionResults(
-        List<string> deletedFiles,
-        List<(string FilePath, string ExceptionMessage)> deletionErrors
+        IEnumerable<string> deletedFiles,
+        IEnumerable<PathError> deletionErrors
     )
     {
         outputService.WriteLine(
-            $"  Result: Deleted {deletedFiles.Count} file(s).",
+            $"  Result: Deleted {deletedFiles.Count()} file(s).",
             OutputLevel.Info
         );
         outputService.WriteLine(string.Empty, OutputLevel.Info);
 
-        if (deletedFiles.Count != 0)
+        if (deletedFiles.Any())
         {
             var files = deletedFiles.OrderBy(f => f).Select(f => fileSystem.GetRelativePath(f));
             outputService.Subsection("Deleted", OutputLevel.Debug);
@@ -204,40 +207,43 @@ public class IdentifyAndSortNewMediaReporter(
             outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
 
-        if (deletionErrors.Count > 0)
+        if (deletionErrors.Any())
         {
             IEnumerable<string> errors = deletionErrors
-                .OrderByPath(x => x.FilePath)
+                .OrderByPath(x => x.Path)
                 .Select(error =>
-                    $"{fileSystem.GetRelativePath(error.FilePath)}: {error.ExceptionMessage}"
+                    $"{fileSystem.GetRelativePath(error.Path)}: {error.Exception.Message}"
                 );
             outputService.List("Deletion failures:", errors, OutputLevel.Error, 5);
             outputService.WriteLine(string.Empty, OutputLevel.Error);
         }
     }
 
-    public void ReportEmptyFolderDeletionResults(EmptyFolderCleanupResult result)
+    public void ReportEmptyFolderDeletionResults(
+        IEnumerable<string> deletedFolders,
+        IEnumerable<PathError> deletionErrors
+    )
     {
         outputService.WriteLine(
-            $"  Result: Deleted {result.DeletedFolders.Count} folder(s).",
+            $"  Result: Deleted {deletedFolders.Count()} folder(s).",
             OutputLevel.Info
         );
         outputService.WriteLine(string.Empty, OutputLevel.Info);
 
-        if (result.DeletedFolders.Count > 0)
+        if (deletedFolders.Any())
         {
-            var items = result
-                .DeletedFolders.OrderByPath(f => f)
+            var items = deletedFolders
+                .OrderByPath(f => f)
                 .Select(f => fileSystem.GetRelativePath(f));
             outputService.Subsection("Deleted", OutputLevel.Debug);
             outputService.List(string.Empty, items, OutputLevel.Debug);
             outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
 
-        if (result.ErroredFolders.Count > 0)
+        if (deletionErrors.Any())
         {
-            var errors = result
-                .ErroredFolders.OrderByPath(e => e.Path)
+            var errors = deletionErrors
+                .OrderByPath(e => e.Path)
                 .Select(e => $"{fileSystem.GetRelativePath(e.Path)}: {e.Exception.Message}");
             outputService.List("Deletion failures:", errors, OutputLevel.Error, 5);
             outputService.WriteLine(string.Empty, OutputLevel.Error);

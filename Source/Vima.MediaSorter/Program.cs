@@ -69,6 +69,7 @@ public static class Program
             ExactFileDuplicateDetectingService
         >();
         services.AddTransient<IFileMovingService, FileMovingService>();
+        services.AddTransient<IFileRemovingService, FileRemovingService>();
         services.AddTransient<IMediaIdentificationService, MediaIdentificationService>();
         services.AddTransient<IMediaSortingService, MediaSortingService>();
         services.AddTransient<IRelatedFilesDiscoveryService, RelatedFilesDiscoveryService>();
