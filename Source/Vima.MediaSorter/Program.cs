@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Processors;
+using Vima.MediaSorter.Processors.CleanupRawMedia;
 using Vima.MediaSorter.Processors.IdentifyAndSortNewMedia;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.Services.Hashers;
@@ -60,6 +61,7 @@ public static class Program
         services.AddTransient<IProcessor, FindDuplicatesProcessor>();
         services.AddTransient<IProcessor, RenameSortedMediaProcessor>();
         services.AddTransient<IProcessor, CleanupRawMediaProcessor>();
+        services.AddTransient<ICleanupRawMediaReporter, CleanupRawMediaReporter>();
 
         services.AddSingleton<IOutputService, OutputService>();
         services.AddTransient<IDirectoryIdentificationService, DirectoryIdentificationService>();
