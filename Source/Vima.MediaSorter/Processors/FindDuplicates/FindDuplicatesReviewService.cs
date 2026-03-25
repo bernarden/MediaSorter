@@ -16,11 +16,8 @@ public interface IFindDuplicatesReviewService
     );
 }
 
-public class FindDuplicatesReviewService(
-    IFindDuplicatesReporter findDuplicatesReporter,
-    IFileSystem fileSystem,
-    IOutputService outputService
-) : IFindDuplicatesReviewService
+public class FindDuplicatesReviewService(IFileSystem fileSystem, IOutputService outputService)
+    : IFindDuplicatesReviewService
 {
     private const string MenuPrompt = "[V]iew files | [N]ext group | [Q]uit review: ";
 
@@ -54,7 +51,7 @@ public class FindDuplicatesReviewService(
                     hashes[path].Width > 0 ? $"{hashes[path].Width}x{hashes[path].Height}" : "N/A";
                 string relativePath = fileSystem.GetRelativePath(path);
                 outputService.WriteLine(
-                    $"  - {relativePath} [{resolution} | {findDuplicatesReporter.FormatFileSize(hashes[path].Size)}]",
+                    $"  - {relativePath} [{resolution} | {hashes[path].Size.FormatFileSize()}]",
                     OutputLevel.Info
                 );
             }
