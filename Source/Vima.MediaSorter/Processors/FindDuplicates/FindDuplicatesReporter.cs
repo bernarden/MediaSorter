@@ -147,7 +147,11 @@ public class FindDuplicatesReporter(
                     return $"{fileSystem.GetRelativePath(path)} [{resolution} | {FormatFileSize(hashes[path].Size)}]";
                 });
 
-            outputService.List($"Group set ({group.Count()} files):", fileDetails, OutputLevel.Debug);
+            outputService.List(
+                $"Group set ({group.Count()} files):",
+                fileDetails,
+                OutputLevel.Debug
+            );
             outputService.WriteLine(string.Empty, OutputLevel.Debug);
         }
     }

@@ -62,8 +62,10 @@ public static class Program
         services.AddTransient<IIdentifyAndSortNewMediaReporter, IdentifyAndSortNewMediaReporter>();
 
         services.AddTransient<IProcessor, FindDuplicatesProcessor>();
-        services.AddTransient<IFindDuplicatesReporter, FindDuplicatesReporter>();
         services.AddTransient<IFindDuplicatesCacheService, FindDuplicatesCacheService>();
+        services.AddTransient<IFindDuplicatesClusteringService, FindDuplicatesClusteringService>();
+        services.AddTransient<IFindDuplicatesReporter, FindDuplicatesReporter>();
+        services.AddTransient<IFindDuplicatesReviewService, FindDuplicatesReviewService>();
 
         services.AddTransient<IProcessor, RenameSortedMediaProcessor>();
 
