@@ -64,6 +64,7 @@ public static class Program
         services.AddTransient<IProcessor, FindDuplicatesProcessor>();
         services.AddTransient<IFindDuplicatesCacheService, FindDuplicatesCacheService>();
         services.AddTransient<IFindDuplicatesClusteringService, FindDuplicatesClusteringService>();
+        services.AddTransient<IFindDuplicatesHasherService, FindDuplicatesHasherService>();
         services.AddTransient<IFindDuplicatesReporter, FindDuplicatesReporter>();
         services.AddTransient<IFindDuplicatesReviewService, FindDuplicatesReviewService>();
 
