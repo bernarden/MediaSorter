@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -7,7 +6,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using SkiaSharp;
 using Vima.MediaSorter.Domain;
 using Vima.MediaSorter.Infrastructure;
 using Vima.MediaSorter.Services;
@@ -16,10 +14,9 @@ using Vima.MediaSorter.Services.Hashers;
 namespace Vima.MediaSorter.Processors.FindDuplicates;
 
 public class FindDuplicatesProcessor(
-    IFileHasher fileHasher,
     IEnumerable<IVisualFileHasher> visualHashers,
     IFindDuplicatesReporter findDuplicatesReporter,
-    IFindDuplicatesCacheService findDuplicatesCacheService,
+    IFindDuplicatesHasherService findDuplicatesHasherService,
     IFindDuplicatesClusteringService findDuplicatesClusteringService,
     IFindDuplicatesReviewService findDuplicatesReviewService,
     IFileSystem fileSystem,
@@ -27,30 +24,6 @@ public class FindDuplicatesProcessor(
     IOptions<MediaSorterOptions> options
 ) : IProcessor
 {
-    private readonly string cacheFilePath = Path.Combine(
-        options.Value.Directory,
-        "Vima.MediaSorter.Hashes.jsonl"
-    );
-
-    private readonly (
-        IVisualFileHasher Avg,
-        IVisualFileHasher Diff,
-        IVisualFileHasher Perc
-    ) hashers = (
-        Avg: visualHashers.First(x => x.Type == VisualHasherType.Average),
-        Diff: visualHashers.First(x => x.Type == VisualHasherType.Difference),
-        Perc: visualHashers.First(x => x.Type == VisualHasherType.Perceptual)
-    );
-
-    private readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".jpg",
-        ".jpeg",
-        ".png",
-        ".webp",
-        ".bmp",
-    };
-
     public ProcessorOptions Option => ProcessorOptions.FindDuplicates;
 
     public async Task Process(CancellationToken token = default)
@@ -76,7 +49,7 @@ public class FindDuplicatesProcessor(
             outputService.Section("[Step 1/1] Duplicate Detection", OutputLevel.Info);
             Stopwatch sw = Stopwatch.StartNew();
 
-            var (hashes, errors) = await GenerateHashes(allFiles);
+            var (hashes, errors) = await findDuplicatesHasherService.GenerateHashes(allFiles, token);
 
             var (exactDuplicates, visualDuplicates) = findDuplicatesClusteringService.Cluster(
                 visualHasher,
@@ -113,101 +86,6 @@ public class FindDuplicatesProcessor(
         }
     }
 
-    private async Task<(
-        ConcurrentDictionary<string, FindDuplicatesFile> hashes,
-        ConcurrentBag<(string Path, Exception Ex)> errors
-    )> GenerateHashes(List<string> allFiles)
-    {
-        var cache = findDuplicatesCacheService.Load();
-        var results = new ConcurrentDictionary<string, FindDuplicatesFile>();
-        var errors = new ConcurrentBag<(string Path, Exception Ex)>();
-
-        await findDuplicatesCacheService.StartWriterAsync();
-
-        outputService.ExecuteWithProgress(
-            "Generating hashes",
-            p =>
-            {
-                int processed = 0;
-
-                Parallel.ForEach(
-                    allFiles,
-                    new ParallelOptions { MaxDegreeOfParallelism = 25 },
-                    path =>
-                    {
-                        try
-                        {
-                            var lastWrite = fileSystem.GetLastWriteTimeUtc(path);
-                            long fileSize = fileSystem.GetFileSize(path);
-
-                            if (
-                                cache.TryGetValue(path, out var cachedEntry)
-                                && cachedEntry.LastModified == lastWrite
-                                && cachedEntry.Size == fileSize
-                            )
-                            {
-                                results[path] = cachedEntry;
-                                findDuplicatesCacheService.QueueToPersist(cachedEntry);
-                            }
-                            else
-                            {
-                                var file = CreateFindDuplicatesFile(path, fileSize, lastWrite);
-                                findDuplicatesCacheService.QueueToPersist(file);
-                                results[path] = file;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            errors.Add((path, ex));
-                        }
-
-                        var current = Interlocked.Increment(ref processed);
-                        if (current % 20 == 0)
-                            p.Report((double)current / allFiles.Count);
-                    }
-                );
-            }
-        );
-
-        await findDuplicatesCacheService.CommitAsync();
-
-        return (results, errors);
-    }
-
-    private FindDuplicatesFile CreateFindDuplicatesFile(
-        string path,
-        long fileSize,
-        DateTime lastWrite
-    )
-    {
-        string bHash = fileHasher.GetHash(path);
-
-        if (!ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
-        {
-            return new FindDuplicatesFile(path, bHash, 0, 0, 0, fileSize, 0, 0, lastWrite);
-        }
-
-        using var stream = fileSystem.CreateFileStream(path, FileMode.Open, FileAccess.Read);
-        using var bitmap = SKBitmap.Decode(stream);
-
-        if (bitmap == null)
-        {
-            return new FindDuplicatesFile(path, bHash, 0, 0, 0, fileSize, 0, 0, lastWrite);
-        }
-
-        return new FindDuplicatesFile(
-            path,
-            bHash,
-            hashers.Avg?.GetHash(bitmap) ?? 0,
-            hashers.Diff?.GetHash(bitmap) ?? 0,
-            hashers.Perc?.GetHash(bitmap) ?? 0,
-            fileSize,
-            bitmap.Width,
-            bitmap.Height,
-            lastWrite
-        );
-    }
-
     private (IVisualFileHasher? visualHasher, int threshold) SelectVisualHasher()
     {
         outputService.WriteLine("Duplicate detection modes:", OutputLevel.Info);
@@ -228,7 +106,7 @@ public class FindDuplicatesProcessor(
             OutputLevel.Info
         );
         outputService.WriteLine(
-            $"Note: Visual modes only apply to: {string.Join(", ", ImageExtensions)}",
+            $"Note: Visual modes only apply to: {string.Join(", ", FindDuplicatesConstants.ImageExtensions)}",
             OutputLevel.Info
         );
         outputService.WriteLine(string.Empty, OutputLevel.Info);
