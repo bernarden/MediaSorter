@@ -10,10 +10,7 @@ namespace Vima.MediaSorter.Services.MediaFileHandlers;
 
 public class Cr3MediaFileHandler() : BaseMediaFileHandler(".cr3")
 {
-    protected override void AfterHandleEffect(MediaFile mediaFile)
-    {
-        mediaFile.SetTargetSubFolder(MediaSorterConstants.RawFolderName);
-    }
+    protected override void AfterHandleEffect(MediaFile mediaFile) => mediaFile.SetTargetSubFolder(MediaSorterConstants.RawFolderName);
 
     public override CreatedOn? GetCreatedOnDateFromMetadata(string filePath)
     {
@@ -21,20 +18,24 @@ public class Cr3MediaFileHandler() : BaseMediaFileHandler(".cr3")
         var directories = QuickTimeMetadataReader.ReadMetadata(fs);
         var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
         if (subIfdDirectory == null)
+        {
             return null;
+        }
 
         if (
             !subIfdDirectory.TryGetDateTime(
                 ExifDirectoryBase.TagDateTimeOriginal,
-                out DateTime createdOn
+                out var createdOn
             )
         )
+        {
             return null;
+        }
 
         var subSecStr = subIfdDirectory
             .GetString(ExifDirectoryBase.TagSubsecondTimeOriginal)
             ?.Trim();
-        if (!string.IsNullOrEmpty(subSecStr) && int.TryParse(subSecStr, out int subSec))
+        if (!string.IsNullOrEmpty(subSecStr) && int.TryParse(subSecStr, out var subSec))
         {
             createdOn = createdOn.AddMilliseconds(subSec * Math.Pow(10, 3 - subSecStr.Length));
         }

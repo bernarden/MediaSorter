@@ -22,7 +22,7 @@ public class FileRemovingService(IFileSystem fileSystem) : IFileRemovingService
         var deletedFiles = new List<string>();
         var erroredFiles = new List<PathError>();
 
-        for (int i = 0; i < paths.Count; i++)
+        for (var i = 0; i < paths.Count; i++)
         {
             var path = paths[i];
             try

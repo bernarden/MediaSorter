@@ -13,18 +13,18 @@ public class AverageVisualFileHasher(IFileSystem fileSystem) : VisualFileHasherB
     protected override ulong GenerateHash(SKBitmap bitmap)
     {
         long sum = 0;
-        for (int y = 0; y < 8; y++)
+        for (var y = 0; y < 8; y++)
         {
-            for (int x = 0; x < 8; x++)
+            for (var x = 0; x < 8; x++)
             {
                 sum += bitmap.GetPixel(x, y).Red;
             }
         }
 
-        byte avg = (byte)(sum / 64);
+        var avg = (byte)(sum / 64);
 
         ulong hash = 0;
-        for (int i = 0; i < 64; i++)
+        for (var i = 0; i < 64; i++)
         {
             if (bitmap.GetPixel(i % 8, i / 8).Red > avg)
             {

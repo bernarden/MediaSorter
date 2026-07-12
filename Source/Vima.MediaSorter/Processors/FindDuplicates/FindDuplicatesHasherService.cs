@@ -43,7 +43,7 @@ public class FindDuplicatesHasherService(
             "Generating hashes",
             p =>
             {
-                int processed = 0;
+                var processed = 0;
 
                 Parallel.ForEach(
                     allFiles,
@@ -53,7 +53,7 @@ public class FindDuplicatesHasherService(
                         try
                         {
                             var lastWrite = fileSystem.GetLastWriteTimeUtc(path);
-                            long fileSize = fileSystem.GetFileSize(path);
+                            var fileSize = fileSystem.GetFileSize(path);
 
                             if (
                                 cache.TryGetValue(path, out var cachedEntry)
@@ -78,7 +78,9 @@ public class FindDuplicatesHasherService(
 
                         var current = Interlocked.Increment(ref processed);
                         if (current % 20 == 0)
+                        {
                             p.Report((double)current / allFiles.Count);
+                        }
                     }
                 );
             }
@@ -95,7 +97,7 @@ public class FindDuplicatesHasherService(
         DateTime lastWrite
     )
     {
-        string bHash = fileHasher.GetHash(path);
+        var bHash = fileHasher.GetHash(path);
 
         if (!FindDuplicatesConstants.ImageExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
         {

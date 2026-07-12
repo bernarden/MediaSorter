@@ -46,7 +46,7 @@ public class CleanupRawMediaReporter(
         IDictionary<string, List<string>> plan
     )
     {
-        int orphanedCount = plan.Sum(p => p.Value.Count);
+        var orphanedCount = plan.Sum(p => p.Value.Count);
         outputService.Table(
             "Analysis result:",
             [

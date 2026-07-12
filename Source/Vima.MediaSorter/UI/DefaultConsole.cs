@@ -49,9 +49,11 @@ public class DefaultConsole : IConsole
     public void ClearCurrentLine()
     {
         if (IsOutputRedirected)
+        {
             return;
+        }
 
-        int currentLineCursor = Console.CursorTop;
+        var currentLineCursor = Console.CursorTop;
         Console.SetCursorPosition(0, currentLineCursor);
         Console.Write(new string(' ', Console.WindowWidth));
         Console.SetCursorPosition(0, currentLineCursor);
@@ -60,7 +62,9 @@ public class DefaultConsole : IConsole
     public void RewriteLine(string value, OutputLevel level)
     {
         if (IsOutputRedirected)
+        {
             return;
+        }
 
         Console.SetCursorPosition(0, Console.CursorTop - 1);
         ClearCurrentLine();
@@ -70,7 +74,9 @@ public class DefaultConsole : IConsole
     private void SetColor(OutputLevel level)
     {
         if (IsOutputRedirected || _currentLevel == level)
+        {
             return;
+        }
 
         _currentLevel = level;
         switch (level)

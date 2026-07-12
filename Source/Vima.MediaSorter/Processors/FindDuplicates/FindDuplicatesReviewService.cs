@@ -26,14 +26,14 @@ public class FindDuplicatesReviewService(IFileSystem fileSystem, IOutputService 
         IDictionary<string, FindDuplicatesFile> hashes
     )
     {
-        string question = "Action: Interactively review duplicate groups one by one?";
+        var question = "Action: Interactively review duplicate groups one by one?";
         if (!outputService.Confirm(question, OutputLevel.Info))
         {
             outputService.Complete("  Operation aborted.");
             return;
         }
 
-        for (int i = 0; i < groups.Count; i++)
+        for (var i = 0; i < groups.Count; i++)
         {
             outputService.WriteLine(string.Empty, OutputLevel.Info);
             outputService.WriteLine(
@@ -47,16 +47,16 @@ public class FindDuplicatesReviewService(IFileSystem fileSystem, IOutputService 
                 .ToList();
             foreach (var path in sortedGroup)
             {
-                string resolution =
+                var resolution =
                     hashes[path].Width > 0 ? $"{hashes[path].Width}x{hashes[path].Height}" : "N/A";
-                string relativePath = fileSystem.GetRelativePath(path);
+                var relativePath = fileSystem.GetRelativePath(path);
                 outputService.WriteLine(
                     $"  - {relativePath} [{resolution} | {hashes[path].Size.FormatFileSize()}]",
                     OutputLevel.Info
                 );
             }
 
-            bool moveToNext = false;
+            var moveToNext = false;
             outputService.Write(MenuPrompt, OutputLevel.Info);
             while (!moveToNext)
             {
@@ -85,7 +85,7 @@ public class FindDuplicatesReviewService(IFileSystem fileSystem, IOutputService 
 
     private void OpenGroupFiles(List<string> group)
     {
-        bool errorOccurred = false;
+        var errorOccurred = false;
 
         foreach (var path in group)
         {
@@ -96,10 +96,12 @@ public class FindDuplicatesReviewService(IFileSystem fileSystem, IOutputService 
             catch (Exception ex)
             {
                 if (!errorOccurred)
+                {
                     outputService.WriteLine(string.Empty, OutputLevel.Info);
+                }
 
                 errorOccurred = true;
-                string relative = fileSystem.GetRelativePath(path);
+                var relative = fileSystem.GetRelativePath(path);
                 outputService.WriteLine(
                     $"(!) Failed to open {relative}: {ex.Message}",
                     OutputLevel.Warn

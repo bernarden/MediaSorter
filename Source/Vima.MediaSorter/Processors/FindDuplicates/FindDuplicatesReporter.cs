@@ -83,9 +83,9 @@ public class FindDuplicatesReporter(
         TimeSpan duration
     )
     {
-        int duplicateSets = allDuplicates.Count();
-        int exactRedundant = exactDuplicates.Sum(d => d.Count() - 1);
-        int visualRedundant = visualDuplicates.Sum(d => d.Count() - 1);
+        var duplicateSets = allDuplicates.Count();
+        var exactRedundant = exactDuplicates.Sum(d => d.Count() - 1);
+        var visualRedundant = visualDuplicates.Sum(d => d.Count() - 1);
 
         outputService.Table(
             "Analysis result:",
@@ -129,7 +129,9 @@ public class FindDuplicatesReporter(
     )
     {
         if (!groups.Any())
+        {
             return;
+        }
 
         outputService.Subsection(title, OutputLevel.Debug);
         foreach (var group in groups)
@@ -139,7 +141,7 @@ public class FindDuplicatesReporter(
                 .ThenByDescending(path => hashes[path].Size)
                 .Select(path =>
                 {
-                    string resolution =
+                    var resolution =
                         hashes[path].Width > 0
                             ? $"{hashes[path].Width}x{hashes[path].Height}"
                             : "N/A";

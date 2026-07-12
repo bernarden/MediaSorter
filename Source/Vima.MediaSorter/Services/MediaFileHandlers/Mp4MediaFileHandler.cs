@@ -15,15 +15,19 @@ public class Mp4MediaFileHandler() : BaseMediaFileHandler(".mp4")
         var directories = QuickTimeMetadataReader.ReadMetadata(fs);
         var subIfdDirectory = directories.OfType<QuickTimeMovieHeaderDirectory>().FirstOrDefault();
         if (subIfdDirectory == null)
+        {
             return null;
+        }
 
         if (
             subIfdDirectory.TryGetDateTime(
                 QuickTimeMovieHeaderDirectory.TagCreated,
-                out DateTime tagCreatedUtcResult
+                out var tagCreatedUtcResult
             ) && !tagCreatedUtcResult.Equals(new(1904, 01, 01, 0, 0, 0))
         )
+        {
             return new(tagCreatedUtcResult, CreatedOnSource.MetadataUtc);
+        }
 
         return null;
     }

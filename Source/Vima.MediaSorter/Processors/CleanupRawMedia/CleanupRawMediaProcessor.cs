@@ -43,7 +43,7 @@ public class CleanupRawMediaProcessor(
 
             outputService.Section("[Step 2/2] Deletion", OutputLevel.Info);
 
-            int totalOrphanedCount = deletionPlan.Sum(p => p.Value.Count);
+            var totalOrphanedCount = deletionPlan.Sum(p => p.Value.Count);
             if (totalOrphanedCount == 0)
             {
                 outputService.Complete("Everything is in sync. No RAW files need to be deleted.");
@@ -84,7 +84,9 @@ public class CleanupRawMediaProcessor(
             var rawFolderPath = Path.Combine(mainFolder, MediaSorterConstants.RawFolderName);
 
             if (!fileSystem.DirectoryExists(rawFolderPath))
+            {
                 continue;
+            }
 
             var curatedBaseNames = fileSystem
                 .EnumerateFiles(mainFolder)

@@ -34,14 +34,16 @@ public class FileMovingService(
         );
 
         const int maxRetries = 5;
-        for (int attempt = 0; attempt < maxRetries; attempt++)
+        for (var attempt = 0; attempt < maxRetries; attempt++)
         {
-            string targetPath = Path.Combine(targetDirectory, targetFileName);
+            var targetPath = Path.Combine(targetDirectory, targetFileName);
 
             if (fileSystem.FileExists(targetPath))
             {
                 if (duplicateDetector.AreIdentical(sourceFilePath, targetPath))
+                {
                     return new DuplicateDetectedFileMove(sourceFilePath, targetPath);
+                }
 
                 targetPath = GenerateUniqueTargetPath(targetDirectory, targetFileName);
             }
@@ -72,10 +74,10 @@ public class FileMovingService(
 
     private string GenerateUniqueTargetPath(string targetDirectory, string targetFileName)
     {
-        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(targetFileName);
-        string extension = Path.GetExtension(targetFileName).ToLowerInvariant();
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(targetFileName);
+        var extension = Path.GetExtension(targetFileName).ToLowerInvariant();
 
-        int count = 1;
+        var count = 1;
         string uniqueTargetPath;
         do
         {

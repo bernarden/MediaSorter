@@ -45,7 +45,9 @@ public class FindDuplicatesCacheService(
     {
         var cache = new Dictionary<string, FindDuplicatesFile>();
         if (!fileSystem.FileExists(_cachePath))
+        {
             return cache;
+        }
 
         try
         {
@@ -90,7 +92,7 @@ public class FindDuplicatesCacheService(
         _writerTask = Task.Run(
             async () =>
             {
-                int batchSize = 100;
+                var batchSize = 100;
                 var batch = new List<FindDuplicatesFile>(batchSize);
                 using var stream = fileSystem.CreateFileStream(
                     _tempCachePath,
@@ -145,12 +147,17 @@ public class FindDuplicatesCacheService(
     {
         _channel?.Writer.Complete();
         if (_writerTask != null)
+        {
             await _writerTask;
+        }
 
         if (fileSystem.FileExists(_tempCachePath))
         {
             if (fileSystem.FileExists(_cachePath))
+            {
                 fileSystem.DeleteFile(_cachePath);
+            }
+
             fileSystem.MoveFile(_tempCachePath, _cachePath);
         }
     }

@@ -24,15 +24,17 @@ public class DirectoryResolver(IOptions<MediaSorterOptions> options) : IDirector
     public DateTime? GetDateFromDirectoryName(string directoryName)
     {
         if (directoryName.Length < _options.FolderNameFormat.Length)
+        {
             return null;
+        }
 
-        string directoryNameBeginning = directoryName[.._options.FolderNameFormat.Length];
+        var directoryNameBeginning = directoryName[.._options.FolderNameFormat.Length];
         return DateTime.TryParseExact(
             directoryNameBeginning,
             _options.FolderNameFormat,
             CultureInfo.InvariantCulture,
             DateTimeStyles.None,
-            out DateTime result
+            out var result
         )
             ? result
             : null;
@@ -45,7 +47,9 @@ public class DirectoryResolver(IOptions<MediaSorterOptions> options) : IDirector
     )
     {
         if (!dateToExistingDirectoryMapping.TryGetValue(date.Date, out var folderName))
+        {
             folderName = date.ToString(_options.FolderNameFormat, CultureInfo.InvariantCulture);
+        }
 
         var path = Path.Combine(_options.Directory, folderName);
         return string.IsNullOrEmpty(subFolder) ? path : Path.Combine(path, subFolder);

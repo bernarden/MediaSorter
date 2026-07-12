@@ -28,7 +28,7 @@ public abstract partial class BaseMediaFileHandler(params string[] extensions) :
     {
         var createdOn = TryGetDateFromFileName(filePath);
         createdOn ??= GetCreatedOnDateFromMetadata(filePath);
-        MediaFile mediaFile = createdOn is null
+        var mediaFile = createdOn is null
             ? new MediaFile(filePath)
             : new MediaFileWithDate(filePath, createdOn);
         AfterHandleEffect(mediaFile);
@@ -41,8 +41,8 @@ public abstract partial class BaseMediaFileHandler(params string[] extensions) :
 
     protected static CreatedOn? TryGetDateFromFileName(string filePath)
     {
-        string fileName = Path.GetFileName(filePath);
-        Match match = FileNameRegex().Match(fileName);
+        var fileName = Path.GetFileName(filePath);
+        var match = FileNameRegex().Match(fileName);
 
         if (match.Success)
         {

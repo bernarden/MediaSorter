@@ -21,14 +21,14 @@ public class DirectoryIdentificationService(
     {
         DirectoryStructure result = new();
         var dateToExistingDirectoriesMapping = new Dictionary<DateTime, List<string>>();
-        string[] directoryPaths = Directory.GetDirectories(options.Value.Directory);
+        var directoryPaths = Directory.GetDirectories(options.Value.Directory);
         if (directoryPaths.Length == 0)
         {
             progress?.Report(1.0);
             return result;
         }
 
-        for (int i = 0; i < directoryPaths.Length; i++)
+        for (var i = 0; i < directoryPaths.Length; i++)
         {
             ScanDirectoryRecursively(
                 new DirectoryInfo(directoryPaths[i]),
@@ -41,7 +41,9 @@ public class DirectoryIdentificationService(
         foreach ((var date, var directories) in dateToExistingDirectoriesMapping)
         {
             if (directories.Count <= 0)
+            {
                 continue;
+            }
 
             result.DateToExistingDirectoryMapping[date] = directories[0];
 
@@ -62,22 +64,30 @@ public class DirectoryIdentificationService(
         bool isInsideSortedBranch = false
     )
     {
-        DateTime? directoryDate = directoryResolver.GetDateFromDirectoryName(directoryInfo.Name);
+        var directoryDate = directoryResolver.GetDateFromDirectoryName(directoryInfo.Name);
         if (directoryDate.HasValue)
         {
             result.SortedFolders.Add(directoryInfo.FullName);
-            DateTime date = directoryDate.Value.Date;
-            if (dateToDirMapping.TryGetValue(date, out List<string>? existingDirectories))
+            var date = directoryDate.Value.Date;
+            if (dateToDirMapping.TryGetValue(date, out var existingDirectories))
+            {
                 existingDirectories.Add(directoryInfo.FullName);
+            }
             else
-                dateToDirMapping.Add(date, new List<string> { directoryInfo.FullName });
+            {
+                dateToDirMapping.Add(date, [directoryInfo.FullName]);
+            }
         }
         else
         {
             if (isInsideSortedBranch)
+            {
                 result.SortedSubFolders.Add(directoryInfo.FullName);
+            }
             else
+            {
                 result.UnsortedFolders.Add(directoryInfo.FullName);
+            }
         }
 
         foreach (var subDir in directoryInfo.GetDirectories())

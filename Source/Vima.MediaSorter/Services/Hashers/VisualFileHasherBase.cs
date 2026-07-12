@@ -41,8 +41,11 @@ public abstract class VisualFileHasherBase(IFileSystem fileSystem) : IVisualFile
     public virtual bool IsMatch(ulong hash1, ulong hash2, int threshold)
     {
         if (hash1 == 0 || hash2 == 0)
+        {
             return false;
-        int distance = BitOperations.PopCount(hash1 ^ hash2);
+        }
+
+        var distance = BitOperations.PopCount(hash1 ^ hash2);
         return distance <= threshold;
     }
 }

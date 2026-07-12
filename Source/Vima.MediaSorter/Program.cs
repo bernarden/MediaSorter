@@ -33,15 +33,17 @@ public static class Program
             DefaultValueFactory = _ => ProcessorOptions.None,
         };
 
-        RootCommand rootCommand = new("Sorts media files into organised folders.");
-        rootCommand.Add(directoryOption);
-        rootCommand.Add(processorOption);
+        RootCommand rootCommand = new("Sorts media files into organised folders.")
+        {
+            directoryOption,
+            processorOption
+        };
 
         rootCommand.SetAction(async parseResult =>
         {
-            string path = parseResult.GetValue(directoryOption) ?? Directory.GetCurrentDirectory();
-            ProcessorOptions option = parseResult.GetValue(processorOption);
-            IServiceProvider serviceProvider = ConfigureServices(path);
+            var path = parseResult.GetValue(directoryOption) ?? Directory.GetCurrentDirectory();
+            var option = parseResult.GetValue(processorOption);
+            var serviceProvider = ConfigureServices(path);
             var app = serviceProvider.GetRequiredService<IAppOrchestrator>();
             return await app.Run(option);
         });

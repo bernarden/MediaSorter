@@ -69,7 +69,7 @@ public class IdentifyAndSortNewMediaReporter(
         var alerts = new List<string>();
         if (directoryStructure.DateToIgnoredDirectoriesMapping.Count > 0)
         {
-            string dateWord =
+            var dateWord =
                 directoryStructure.DateToIgnoredDirectoriesMapping.Count == 1
                     ? "date has"
                     : "dates have";
@@ -158,7 +158,7 @@ public class IdentifyAndSortNewMediaReporter(
     {
         if (result.Errors.Count > 0)
         {
-            IEnumerable<string> sortingErrors = result
+            var sortingErrors = result
                 .Errors.OrderByPath(x => x.SourcePath)
                 .Select(e => $"{fileSystem.GetRelativePath(e.SourcePath)}: {e.Exception.Message}");
             outputService.List("Sorting Errors:", sortingErrors, OutputLevel.Error, 5);
@@ -209,7 +209,7 @@ public class IdentifyAndSortNewMediaReporter(
 
         if (deletionErrors.Any())
         {
-            IEnumerable<string> errors = deletionErrors
+            var errors = deletionErrors
                 .OrderByPath(x => x.Path)
                 .Select(error =>
                     $"{fileSystem.GetRelativePath(error.Path)}: {error.Exception.Message}"

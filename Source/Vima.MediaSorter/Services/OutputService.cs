@@ -57,12 +57,16 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
     public void Initialize()
     {
         if (_logFileStream != null)
+        {
             return;
+        }
 
         lock (_lock)
         {
             if (_logFileStream != null)
+            {
                 return;
+            }
 
             try
             {
@@ -71,7 +75,9 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
                     : _options.Directory;
 
                 if (!Directory.Exists(logDir))
+                {
                     Directory.CreateDirectory(logDir);
+                }
 
                 if (string.IsNullOrEmpty(_fullLogPath))
                 {
@@ -163,14 +169,16 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
     {
         var visibleItems = items.Where(i => i.Condition).ToList();
         if (visibleItems.Count == 0)
+        {
             return;
+        }
 
         if (title != null)
         {
             WriteLine(title, level);
         }
 
-        int maxKeyLength = visibleItems.Max(i => i.Key.Length);
+        var maxKeyLength = visibleItems.Max(i => i.Key.Length);
         foreach (var item in visibleItems)
         {
             WriteLine($"  {item.Key.PadRight(maxKeyLength)} {item.Value}", level);
@@ -188,7 +196,9 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
     {
         var itemList = items.ToList();
         if (itemList.Count == 0)
+        {
             return;
+        }
 
         if (!string.IsNullOrWhiteSpace(title))
         {
@@ -203,7 +213,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
 
         if (maxItems.HasValue && itemList.Count > maxItems.Value)
         {
-            int remainingCount = itemList.Count - maxItems.Value;
+            var remainingCount = itemList.Count - maxItems.Value;
             _console.WriteLine($"  ... (see logs for {remainingCount} more)", level);
 
             foreach (var item in itemList.Skip(maxItems.Value))
@@ -217,13 +227,13 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
     {
         ConsoleKey response;
         char displayChar;
-        string questionWithDefault =
+        var questionWithDefault =
             $"{question} {(defaultAnswer == ConsoleKey.Y ? "[Y/n]" : "[y/N]")} ";
 
         while (true)
         {
             _console.Write(questionWithDefault, level);
-            ConsoleKeyInfo keyInfo = _console.ReadKey(true);
+            var keyInfo = _console.ReadKey(true);
 
             if (keyInfo.Key is ConsoleKey.Y or ConsoleKey.N or ConsoleKey.Enter)
             {
@@ -246,13 +256,13 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
     public int PromptForInt(string prompt, int defaultValue, int min, int max, OutputLevel level)
     {
         int result;
-        string formattedPrompt = $"{prompt}: ";
+        var formattedPrompt = $"{prompt}: ";
 
         while (true)
         {
             _console.Write(formattedPrompt, OutputLevel.Info);
-            string? input = _console.ReadLine()?.Trim();
-            bool isDefault = string.IsNullOrEmpty(input);
+            var input = _console.ReadLine()?.Trim();
+            var isDefault = string.IsNullOrEmpty(input);
 
             if (isDefault)
             {
@@ -262,7 +272,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
             }
 
             if (
-                int.TryParse(input, out int parsedValue)
+                int.TryParse(input, out var parsedValue)
                 && parsedValue >= min
                 && parsedValue <= max
             )
@@ -278,9 +288,9 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
 
     public TimeSpan GetVideoUtcOffsetFromUser()
     {
-        TimeSpan defaultOffsetTimeSpan = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
-        string originalSign = defaultOffsetTimeSpan.TotalMinutes >= 0 ? "+" : "-";
-        string formattedOffset =
+        var defaultOffsetTimeSpan = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+        var originalSign = defaultOffsetTimeSpan.TotalMinutes >= 0 ? "+" : "-";
+        var formattedOffset =
             $"{originalSign}{defaultOffsetTimeSpan.Hours:00}:{defaultOffsetTimeSpan.Minutes:00}";
         StringBuilder offset = new(formattedOffset);
 
@@ -288,7 +298,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
 
         while (true)
         {
-            ConsoleKeyInfo keyInfo = _console.ReadKey(true);
+            var keyInfo = _console.ReadKey(true);
             if (keyInfo.Key == ConsoleKey.Enter)
             {
                 _console.WriteLine(string.Empty, OutputLevel.Info);
@@ -298,13 +308,17 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
             if (keyInfo.Key == ConsoleKey.Backspace)
             {
                 if (offset.Length > 0)
+                {
                     offset.Remove(offset.Length - 1, 1);
+                }
             }
             else if (!char.IsControl(keyInfo.KeyChar))
             {
-                int position = offset.Length;
+                var position = offset.Length;
                 if (position < 6 && IsAllowedCharacter(keyInfo.KeyChar, position))
+                {
                     offset.Append(keyInfo.KeyChar);
+                }
             }
 
             DisplayOffset();
@@ -317,21 +331,30 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         TimeSpan ConvertOffsetToTimeSpan(string offsetResult)
         {
             if (string.IsNullOrEmpty(offsetResult) || offsetResult.Length != 6)
+            {
                 throw new ArgumentException("Invalid offset format. Must be in the format ±hh:mm");
+            }
 
-            char signResult = offsetResult[0];
+            var signResult = offsetResult[0];
             if (signResult != '+' && signResult != '-')
+            {
                 throw new ArgumentException("Offset must start with a '+' or '-' sign.");
+            }
 
             if (
-                !int.TryParse(offsetResult.AsSpan(1, 2), out int hours)
-                || !int.TryParse(offsetResult.AsSpan(4, 2), out int minutes)
+                !int.TryParse(offsetResult.AsSpan(1, 2), out var hours)
+                || !int.TryParse(offsetResult.AsSpan(4, 2), out var minutes)
             )
+            {
                 throw new ArgumentException("Invalid hours or minutes in offset.");
+            }
 
             TimeSpan timeSpan = new(hours, minutes, 0);
             if (signResult == '-')
+            {
                 timeSpan = timeSpan.Negate();
+            }
+
             return timeSpan;
         }
 
@@ -352,15 +375,9 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
         }
     }
 
-    public ConsoleKey ReadKey(bool intercept = true)
-    {
-        return _console.ReadKey(intercept).Key;
-    }
+    public ConsoleKey ReadKey(bool intercept = true) => _console.ReadKey(intercept).Key;
 
-    public string? ReadLine()
-    {
-        return _console.ReadLine();
-    }
+    public string? ReadLine() => _console.ReadLine();
 
     public void Write(string message, OutputLevel level)
     {
@@ -413,7 +430,9 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
     private void LogToFile(string message, OutputLevel level, bool addNewLine = true)
     {
         if (_logStreamWriter == null)
+        {
             return;
+        }
 
         lock (_lock)
         {
@@ -422,7 +441,7 @@ public class OutputService(IConsole console, IOptions<MediaSorterOptions> option
             var prefix = $"[{timestamp}] [{levelStr}] ";
 
             var lines = message.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
-            for (int i = 0; i < lines.Length; i++)
+            for (var i = 0; i < lines.Length; i++)
             {
                 if (_isAtStartOfFileLine)
                 {

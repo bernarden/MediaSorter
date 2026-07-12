@@ -4,9 +4,8 @@ namespace Vima.MediaSorter.Domain;
 
 public class IdentifiedMedia
 {
-    public IReadOnlyList<MediaFileWithDate> MediaFilesWithDates { get; init; } =
-        new List<MediaFileWithDate>();
-    public IReadOnlyList<MediaFile> MediaFilesWithoutDates { get; init; } = new List<MediaFile>();
-    public IReadOnlyList<PathError> ErroredFiles { get; init; } = new List<PathError>();
-    public IReadOnlyList<string> UnsupportedFiles { get; init; } = new List<string>();
+    public IReadOnlyList<MediaFileWithDate> MediaFilesWithDates { get; init; } = [];
+    public IReadOnlyList<MediaFile> MediaFilesWithoutDates { get; init; } = [];
+    public IReadOnlyList<PathError> ErroredFiles { get; init; } = [];
+    public IReadOnlyList<string> UnsupportedFiles { get; init; } = [];
 }

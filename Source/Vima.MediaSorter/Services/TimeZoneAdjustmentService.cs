@@ -20,9 +20,11 @@ public class TimeZoneAdjustmentService(IOutputService outputService) : ITimeZone
             .ToList();
 
         if (targetFiles.Count == 0)
+        {
             return result;
+        }
 
-        TimeSpan offset = outputService.GetVideoUtcOffsetFromUser();
+        var offset = outputService.GetVideoUtcOffsetFromUser();
 
         foreach (var file in targetFiles)
         {

@@ -4,6 +4,6 @@ namespace Vima.MediaSorter.Domain;
 
 public class AssociatedMedia
 {
-    public IReadOnlyList<string> AssociatedFiles { get; init; } = new List<string>();
-    public IReadOnlyList<string> RemainingIgnoredFiles { get; init; } = new List<string>();
+    public IReadOnlyList<string> AssociatedFiles { get; init; } = [];
+    public IReadOnlyList<string> RemainingIgnoredFiles { get; init; } = [];
 }

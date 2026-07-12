@@ -30,8 +30,12 @@ public partial class RelatedFilesDiscoveryService : IRelatedFilesDiscoveryServic
         void ClaimFiles(string lookupPath, MediaFile target)
         {
             foreach (var file in ignoredIndex.GetValueOrDefault(lookupPath) ?? [])
+            {
                 if (associated.Add(file))
+                {
                     target.RelatedFiles.Add(file);
+                }
+            }
         }
 
         foreach (var mediaFile in identifiedFiles)

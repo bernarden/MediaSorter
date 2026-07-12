@@ -47,49 +47,25 @@ public class FileSystem(IOptions<MediaSorterOptions> options) : IFileSystem
         string path,
         string searchPattern = "*",
         SearchOption searchOption = SearchOption.TopDirectoryOnly
-    )
-    {
-        return Directory.EnumerateFiles(path, searchPattern, searchOption);
-    }
+    ) => Directory.EnumerateFiles(path, searchPattern, searchOption);
 
     public IEnumerable<string> EnumerateDirectories(
         string path,
         string searchPattern = "*",
         SearchOption searchOption = SearchOption.TopDirectoryOnly
-    )
-    {
-        return Directory.EnumerateDirectories(path, searchPattern, searchOption);
-    }
+    ) => Directory.EnumerateDirectories(path, searchPattern, searchOption);
 
-    public bool FileExists(string path)
-    {
-        return File.Exists(path);
-    }
+    public bool FileExists(string path) => File.Exists(path);
 
-    public bool DirectoryExists(string path)
-    {
-        return Directory.Exists(path);
-    }
+    public bool DirectoryExists(string path) => Directory.Exists(path);
 
-    public void CreateDirectory(string path)
-    {
-        Directory.CreateDirectory(path);
-    }
+    public void CreateDirectory(string path) => Directory.CreateDirectory(path);
 
-    public void DeleteFile(string path)
-    {
-        File.Delete(path);
-    }
+    public void DeleteFile(string path) => File.Delete(path);
 
-    public void DeleteDirectory(string path, bool recursive = false)
-    {
-        Directory.Delete(path, recursive);
-    }
+    public void DeleteDirectory(string path, bool recursive = false) => Directory.Delete(path, recursive);
 
-    public void MoveFile(string source, string destination)
-    {
-        File.Move(source, destination);
-    }
+    public void MoveFile(string source, string destination) => File.Move(source, destination);
 
     public FileStream CreateFileStream(
         string path,
@@ -98,26 +74,19 @@ public class FileSystem(IOptions<MediaSorterOptions> options) : IFileSystem
         FileShare share = FileShare.ReadWrite,
         int bufferSize = 4096,
         bool useAsync = false
-    )
-    {
-        return new FileStream(path, mode, access, share, bufferSize, useAsync);
-    }
+    ) => new(path, mode, access, share, bufferSize, useAsync);
 
-    public long GetFileSize(string path)
-    {
-        return new FileInfo(path).Length;
-    }
+    public long GetFileSize(string path) => new FileInfo(path).Length;
 
     public string GetRelativePath(string? path, string? relativeTo = null)
     {
         if (string.IsNullOrEmpty(path))
+        {
             return string.Empty;
+        }
 
         return Path.GetRelativePath(relativeTo ?? _options.Directory, path);
     }
 
-    public DateTime GetLastWriteTimeUtc(string path)
-    {
-        return new FileInfo(path).LastWriteTimeUtc;
-    }
+    public DateTime GetLastWriteTimeUtc(string path) => new FileInfo(path).LastWriteTimeUtc;
 }

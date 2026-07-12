@@ -4,7 +4,7 @@ namespace Vima.MediaSorter.Domain;
 
 public class FileRemovingResult
 {
-    public IReadOnlyList<string> DeletedFiles { get; init; } = new List<string>();
+    public IReadOnlyList<string> DeletedFiles { get; init; } = [];
 
-    public IReadOnlyList<PathError> ErroredFiles { get; init; } = new List<PathError>();
+    public IReadOnlyList<PathError> ErroredFiles { get; init; } = [];
 }

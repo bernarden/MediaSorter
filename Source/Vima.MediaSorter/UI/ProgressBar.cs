@@ -51,11 +51,13 @@ public class ProgressBar : IDisposable, IProgress<double>
         lock (_timer)
         {
             if (_disposed)
+            {
                 return;
+            }
 
-            int progressBlockCount = (int)(_currentProgress * BlockCount);
-            int percent = (int)(_currentProgress * 100);
-            string text = string.Format(
+            var progressBlockCount = (int)(_currentProgress * BlockCount);
+            var percent = (int)(_currentProgress * 100);
+            var text = string.Format(
                 "[{0}{1}] {2,3}% {3}",
                 new string('#', progressBlockCount),
                 new string('-', BlockCount - progressBlockCount),
@@ -71,8 +73,8 @@ public class ProgressBar : IDisposable, IProgress<double>
     private void UpdateText(string text)
     {
         // Get length of common portion
-        int commonPrefixLength = 0;
-        int commonLength = Math.Min(_currentText.Length, text.Length);
+        var commonPrefixLength = 0;
+        var commonLength = Math.Min(_currentText.Length, text.Length);
         while (
             commonPrefixLength < commonLength
             && text[commonPrefixLength] == _currentText[commonPrefixLength]
@@ -89,7 +91,7 @@ public class ProgressBar : IDisposable, IProgress<double>
         outputBuilder.Append(text.AsSpan(commonPrefixLength));
 
         // If the new text is shorter than the old one: delete overlapping characters
-        int overlapCount = _currentText.Length - text.Length;
+        var overlapCount = _currentText.Length - text.Length;
         if (overlapCount > 0)
         {
             outputBuilder.Append(' ', overlapCount);
@@ -100,10 +102,7 @@ public class ProgressBar : IDisposable, IProgress<double>
         _currentText = text;
     }
 
-    private void ResetTimer()
-    {
-        _timer.Change(_animationInterval, TimeSpan.FromMilliseconds(-1));
-    }
+    private void ResetTimer() => _timer.Change(_animationInterval, TimeSpan.FromMilliseconds(-1));
 
     public void Dispose()
     {

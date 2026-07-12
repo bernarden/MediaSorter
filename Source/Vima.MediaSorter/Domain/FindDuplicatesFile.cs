@@ -3,24 +3,24 @@
 namespace Vima.MediaSorter.Domain;
 
 public class FindDuplicatesFile(
-    string Path,
-    string BinaryHash,
-    ulong AverageHash,
-    ulong DifferenceHash,
-    ulong PerceptualHash,
-    long Size,
-    int Width,
-    int Height,
-    DateTime LastModified
+    string path,
+    string binaryHash,
+    ulong averageHash,
+    ulong differenceHash,
+    ulong perceptualHash,
+    long size,
+    int width,
+    int height,
+    DateTime lastModified
 )
 {
-    public string Path { get; } = Path;
-    public string BinaryHash { get; } = BinaryHash;
-    public ulong AverageHash { get; } = AverageHash;
-    public ulong DifferenceHash { get; } = DifferenceHash;
-    public ulong PerceptualHash { get; } = PerceptualHash;
-    public long Size { get; } = Size;
-    public int Width { get; } = Width;
-    public int Height { get; } = Height;
-    public DateTime LastModified { get; } = LastModified;
+    public string Path { get; } = path;
+    public string BinaryHash { get; } = binaryHash;
+    public ulong AverageHash { get; } = averageHash;
+    public ulong DifferenceHash { get; } = differenceHash;
+    public ulong PerceptualHash { get; } = perceptualHash;
+    public long Size { get; } = size;
+    public int Width { get; } = width;
+    public int Height { get; } = height;
+    public DateTime LastModified { get; } = lastModified;
 }

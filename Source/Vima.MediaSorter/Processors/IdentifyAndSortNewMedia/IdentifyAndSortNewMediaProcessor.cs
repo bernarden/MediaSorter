@@ -45,7 +45,7 @@ public class IdentifyAndSortNewMediaProcessor(
             List<string> directoriesToScan = [options.Value.Directory];
             if (directoryStructure.UnsortedFolders.Count > 0)
             {
-                string question =
+                var question =
                     $"Action: Include {directoryStructure.UnsortedFolders.Count} unsorted sub-folder(s) in scan?";
                 if (outputService.Confirm(question, OutputLevel.Info))
                 {
@@ -73,7 +73,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
             outputService.Section("[Step 2/2] Sorting", OutputLevel.Info);
 
-            int totalFilesToMove =
+            var totalFilesToMove =
                 identified.MediaFilesWithDates.Count + associated.AssociatedFiles.Count;
             var targetFolderCount = identified
                 .MediaFilesWithDates.Select(f => f.CreatedOn.Date.ToString("yyyy-MM-dd"))
@@ -127,7 +127,7 @@ public class IdentifyAndSortNewMediaProcessor(
 
             HandleDuplicates(sortingResult.Duplicates);
 
-            List<string> affectedFolders = sortingResult
+            var affectedFolders = sortingResult
                 .Moved.Select(m => Path.GetDirectoryName(m.SourcePath))
                 .Concat(sortingResult.Duplicates.Select(d => Path.GetDirectoryName(d.SourcePath)))
                 .Where(path => path != null && !string.IsNullOrEmpty(path))
@@ -151,9 +151,11 @@ public class IdentifyAndSortNewMediaProcessor(
     private void HandleDuplicates(IReadOnlyList<DuplicateDetectedFileMove> duplicates)
     {
         if (duplicates.Count == 0)
+        {
             return;
+        }
 
-        string question = $"Action: Delete {duplicates.Count} exact duplicates?";
+        var question = $"Action: Delete {duplicates.Count} exact duplicates?";
         if (!outputService.Confirm(question, OutputLevel.Info))
         {
             outputService.WriteLine("  Duplicate cleanup aborted.", OutputLevel.Info);
@@ -176,7 +178,9 @@ public class IdentifyAndSortNewMediaProcessor(
     {
         var foldersToDelete = emptyFolderCleanupService.GetFoldersForDeletion(affectedFolders);
         if (foldersToDelete.Count == 0)
+        {
             return;
+        }
 
         outputService.Subsection("Planned deletions", OutputLevel.Debug);
         outputService.List(
@@ -186,7 +190,7 @@ public class IdentifyAndSortNewMediaProcessor(
         );
         outputService.WriteLine(string.Empty, OutputLevel.Debug);
 
-        string question = $"Action: Delete {foldersToDelete.Count} empty folder(s)?";
+        var question = $"Action: Delete {foldersToDelete.Count} empty folder(s)?";
         if (!outputService.Confirm(question, OutputLevel.Info))
         {
             outputService.WriteLine("  Folder cleanup aborted.", OutputLevel.Info);

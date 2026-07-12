@@ -37,22 +37,24 @@ public class RenameSortedMediaPlanService(
             foreach (var secondGroup in secondGroups)
             {
                 var items = secondGroup.ToList();
-                bool needsPrecision = items.Count > 1;
+                var needsPrecision = items.Count > 1;
 
                 if (needsPrecision)
+                {
                     items.ForEach(TryEnhanceMetadata);
+                }
 
                 var sorted = items
                     .OrderBy(f => f.CreatedOn.Date.Ticks)
                     .ThenBy(f => Path.GetFileName(f.FilePath))
                     .ToList();
 
-                DateTime lastAssignedTime = DateTime.MinValue;
+                var lastAssignedTime = DateTime.MinValue;
 
                 foreach (var media in sorted)
                 {
-                    DateTime targetTime = media.CreatedOn.Date;
-                    string format = needsPrecision
+                    var targetTime = media.CreatedOn.Date;
+                    var format = needsPrecision
                         ? MediaSorterConstants.PrecisionDateFormat
                         : MediaSorterConstants.StandardDateFormat;
 
@@ -62,17 +64,19 @@ public class RenameSortedMediaPlanService(
                     }
 
                     lastAssignedTime = targetTime;
-                    string newBaseName = targetTime.ToString(format);
+                    var newBaseName = targetTime.ToString(format);
 
                     var allPaths = new List<string> { media.FilePath }.Concat(media.RelatedFiles);
                     foreach (var oldPath in allPaths)
                     {
-                        string ext = Path.GetExtension(oldPath);
-                        string newFileName = newBaseName + ext;
-                        string newPath = Path.Combine(folderGroup.Key!, newFileName);
+                        var ext = Path.GetExtension(oldPath);
+                        var newFileName = newBaseName + ext;
+                        var newPath = Path.Combine(folderGroup.Key!, newFileName);
 
                         if (string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+                        {
                             continue;
+                        }
 
                         plan.Add(new FileMove(oldPath, newPath));
                     }
@@ -90,7 +94,7 @@ public class RenameSortedMediaPlanService(
 
         outputService.ExecuteWithProgress("  Renaming files", p =>
         {
-            for (int i = 0; i < plan.Count; i++)
+            for (var i = 0; i < plan.Count; i++)
             {
                 var op = plan[i];
                 try
@@ -131,13 +135,18 @@ public class RenameSortedMediaPlanService(
 
     private void TryEnhanceMetadata(MediaFileWithDate file)
     {
-        if (file.CreatedOn.Source != CreatedOnSource.FileName) return;
+        if (file.CreatedOn.Source != CreatedOnSource.FileName)
+        {
+            return;
+        }
 
         var ext = Path.GetExtension(file.FilePath).ToLowerInvariant();
         var handler = mediaFileHandlers.FirstOrDefault(h => h.CanHandle(ext));
         var highPrecisionDate = handler?.GetCreatedOnDateFromMetadata(file.FilePath);
 
         if (highPrecisionDate != null)
+        {
             file.SetCreatedOn(highPrecisionDate);
+        }
     }
 }

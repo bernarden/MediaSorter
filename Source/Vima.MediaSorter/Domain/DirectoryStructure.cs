@@ -11,9 +11,9 @@ public class DirectoryStructure
     public IDictionary<DateTime, IList<string>> DateToIgnoredDirectoriesMapping { get; } =
         new Dictionary<DateTime, IList<string>>();
 
-    public IList<string> SortedFolders { get; } = new List<string>();
+    public IList<string> SortedFolders { get; } = [];
 
-    public IList<string> SortedSubFolders { get; } = new List<string>();
+    public IList<string> SortedSubFolders { get; } = [];
 
-    public IList<string> UnsortedFolders { get; } = new List<string>();
+    public IList<string> UnsortedFolders { get; } = [];
 }

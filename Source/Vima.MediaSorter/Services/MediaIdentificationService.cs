@@ -33,11 +33,11 @@ public class MediaIdentificationService(IEnumerable<IMediaFileHandler> mediaFile
             return new IdentifiedMedia();
         }
 
-        int processedFileCounter = 0;
-        ConcurrentBag<MediaFileWithDate> mediaFilesWithDates = new();
-        ConcurrentBag<MediaFile> mediaFilesWithoutDates = new();
-        ConcurrentBag<PathError> erroredFiles = new();
-        ConcurrentBag<string> unsupportedFiles = new();
+        var processedFileCounter = 0;
+        ConcurrentBag<MediaFileWithDate> mediaFilesWithDates = [];
+        ConcurrentBag<MediaFile> mediaFilesWithoutDates = [];
+        ConcurrentBag<PathError> erroredFiles = [];
+        ConcurrentBag<string> unsupportedFiles = [];
         Parallel.ForEach(
             filePaths,
             new() { MaxDegreeOfParallelism = 25 },

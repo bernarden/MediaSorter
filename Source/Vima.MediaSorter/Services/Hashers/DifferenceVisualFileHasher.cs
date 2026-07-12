@@ -13,14 +13,14 @@ public class DifferenceVisualFileHasher(IFileSystem fileSystem) : VisualFileHash
     protected override ulong GenerateHash(SKBitmap bitmap)
     {
         ulong hash = 0;
-        int bitIndex = 0;
+        var bitIndex = 0;
 
-        for (int y = 0; y < 8; y++)
+        for (var y = 0; y < 8; y++)
         {
-            for (int x = 0; x < 8; x++)
+            for (var x = 0; x < 8; x++)
             {
-                byte left = bitmap.GetPixel(x, y).Red;
-                byte right = bitmap.GetPixel(x + 1, y).Red;
+                var left = bitmap.GetPixel(x, y).Red;
+                var right = bitmap.GetPixel(x + 1, y).Red;
 
                 if (left > right)
                 {

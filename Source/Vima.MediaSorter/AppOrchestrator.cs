@@ -55,9 +55,11 @@ public class AppOrchestrator(
 
             while (true)
             {
-                ProcessorOptions selectedOption = GetProcessorOption();
+                var selectedOption = GetProcessorOption();
                 if (selectedOption == ProcessorOptions.Exit)
+                {
                     break;
+                }
 
                 await ExecuteByOption(selectedOption, cts.Token);
             }
@@ -88,7 +90,7 @@ public class AppOrchestrator(
             .GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion;
-        string versionInfo = assemblyVersion?.Split('+') switch
+        var versionInfo = assemblyVersion?.Split('+') switch
         {
             [var v, var h] => $"v{v} ({h[..Math.Min(7, h.Length)]})",
             [var v] => $"v{v} (unknown)",
@@ -142,7 +144,7 @@ public class AppOrchestrator(
         );
         outputService.WriteLine(string.Empty, OutputLevel.Info);
 
-        int result = outputService.PromptForInt(
+        var result = outputService.PromptForInt(
             "Enter choice",
             (int)ProcessorOptions.Exit,
             0,

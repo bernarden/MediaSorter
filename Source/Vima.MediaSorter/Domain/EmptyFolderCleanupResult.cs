@@ -4,7 +4,7 @@ namespace Vima.MediaSorter.Domain;
 
 public class EmptyFolderCleanupResult
 {
-    public IReadOnlyList<string> DeletedFolders { get; init; } = new List<string>();
+    public IReadOnlyList<string> DeletedFolders { get; init; } = [];
 
-    public IReadOnlyList<PathError> ErroredFolders { get; init; } = new List<PathError>();
+    public IReadOnlyList<PathError> ErroredFolders { get; init; } = [];
 }

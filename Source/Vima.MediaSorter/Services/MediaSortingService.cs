@@ -33,7 +33,7 @@ public class MediaSortingService(
         var duplicateBag = new ConcurrentBag<DuplicateDetectedFileMove>();
         var errorBag = new ConcurrentBag<ErroredFileMove>();
 
-        int processedCounter = 0;
+        var processedCounter = 0;
 
         Parallel.ForEach(
             files,
@@ -50,7 +50,7 @@ public class MediaSortingService(
                 {
                     try
                     {
-                        FileMove moveResult = fileMovingService.Move(
+                        var moveResult = fileMovingService.Move(
                             path,
                             targetFolder,
                             Path.GetFileName(path)

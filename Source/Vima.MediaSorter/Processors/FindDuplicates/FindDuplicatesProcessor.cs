@@ -42,12 +42,12 @@ public class FindDuplicatesProcessor(
                     SearchOption.AllDirectories
                 ),
             ];
-            string? targetFolder = SelectTargetFolder(allFiles);
+            var targetFolder = SelectTargetFolder(allFiles);
 
             var (visualHasher, threshold) = SelectVisualHasher();
 
             outputService.Section("[Step 1/1] Duplicate Detection", OutputLevel.Info);
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             var (hashes, errors) = await findDuplicatesHasherService.GenerateHashes(allFiles, token);
 
@@ -129,8 +129,8 @@ public class FindDuplicatesProcessor(
             return (null, 0);
         }
 
-        int recommended = choice == VisualHasherType.Perceptual ? 8 : 2;
-        int threshold = outputService.PromptForInt(
+        var recommended = choice == VisualHasherType.Perceptual ? 8 : 2;
+        var threshold = outputService.PromptForInt(
             $"Threshold 0-64 (match:0, default:{recommended}, loose:15)",
             recommended,
             0,
@@ -158,7 +158,9 @@ public class FindDuplicatesProcessor(
         outputService.WriteLine(string.Empty, OutputLevel.Info);
 
         if (mode == 0)
+        {
             return null;
+        }
 
         var folders = allFiles
             .Select(Path.GetDirectoryName)
@@ -166,19 +168,19 @@ public class FindDuplicatesProcessor(
             .Distinct()
             .OrderBy(d => d)
             .ToList();
-        int maxDigits = folders.Count.ToString().Length;
+        var maxDigits = folders.Count.ToString().Length;
         var folderOptions = folders.Select(
             (path, i) =>
             {
-                string prefix = $"[{i}]".PadLeft(maxDigits + 2);
-                string relativePath = fileSystem.GetRelativePath(path);
-                string displayPath = string.IsNullOrEmpty(relativePath) ? "." : relativePath;
+                var prefix = $"[{i}]".PadLeft(maxDigits + 2);
+                var relativePath = fileSystem.GetRelativePath(path);
+                var displayPath = string.IsNullOrEmpty(relativePath) ? "." : relativePath;
                 return $"{prefix} {displayPath}";
             }
         );
         outputService.List("Target folders:", folderOptions, OutputLevel.Info);
 
-        int choice = outputService.PromptForInt(
+        var choice = outputService.PromptForInt(
             "Select folder index",
             0,
             0,

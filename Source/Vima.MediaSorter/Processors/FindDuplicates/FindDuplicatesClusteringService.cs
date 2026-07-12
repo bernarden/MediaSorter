@@ -37,7 +37,7 @@ public class FindDuplicatesClusteringService(IOutputService outputService)
             "Clustering duplicates",
             p =>
             {
-                List<List<string>> binaryDuplicates = hashes
+                var binaryDuplicates = hashes
                     .Values.GroupBy(entry => entry.BinaryHash)
                     .Select(group => group.Select(entry => entry.Path).ToList())
                     .Where(paths =>
@@ -46,7 +46,7 @@ public class FindDuplicatesClusteringService(IOutputService outputService)
                     )
                     .ToList();
 
-                List<List<string>> visualDuplicates = new();
+                List<List<string>> visualDuplicates = [];
                 var processed = new HashSet<string>();
                 var visualHashes = hashes
                     .Select(kvp => new
@@ -68,19 +68,21 @@ public class FindDuplicatesClusteringService(IOutputService outputService)
                         ? paths
                         : paths.Where(path => path.StartsWith(targetFolder)).ToList();
 
-                for (int i = 0; i < targetPaths.Count; i++)
+                for (var i = 0; i < targetPaths.Count; i++)
                 {
-                    string targetPath = targetPaths[i];
+                    var targetPath = targetPaths[i];
                     if (!processed.Contains(targetPath))
                     {
                         var currentSet = new List<string> { targetPath };
-                        ulong h1 = visualHashes[targetPath];
+                        var h1 = visualHashes[targetPath];
 
-                        for (int j = i + 1; j < paths.Count; j++)
+                        for (var j = i + 1; j < paths.Count; j++)
                         {
-                            string anotherPath = paths[j];
+                            var anotherPath = paths[j];
                             if (processed.Contains(anotherPath) || targetPath == anotherPath)
+                            {
                                 continue;
+                            }
 
                             var h2 = visualHashes[anotherPath];
                             if (BitOperations.PopCount(h1 ^ h2) <= threshold)
@@ -91,7 +93,9 @@ public class FindDuplicatesClusteringService(IOutputService outputService)
                         }
 
                         if (currentSet.Count > 1)
+                        {
                             visualDuplicates.Add(currentSet);
+                        }
 
                         processed.Add(targetPath);
                     }
