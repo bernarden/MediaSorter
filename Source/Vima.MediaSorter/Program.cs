@@ -9,6 +9,7 @@ using Vima.MediaSorter.Processors;
 using Vima.MediaSorter.Processors.CleanupRawMedia;
 using Vima.MediaSorter.Processors.FindDuplicates;
 using Vima.MediaSorter.Processors.IdentifyAndSortNewMedia;
+using Vima.MediaSorter.Processors.RenameSortedMedia;
 using Vima.MediaSorter.Services;
 using Vima.MediaSorter.Services.Hashers;
 using Vima.MediaSorter.Services.MediaFileHandlers;
@@ -69,6 +70,8 @@ public static class Program
         services.AddTransient<IFindDuplicatesReviewService, FindDuplicatesReviewService>();
 
         services.AddTransient<IProcessor, RenameSortedMediaProcessor>();
+        services.AddTransient<IRenameSortedMediaPlanService, RenameSortedMediaPlanService>();
+        services.AddTransient<IRenameSortedMediaReporter, RenameSortedMediaReporter>();
 
         services.AddTransient<IProcessor, CleanupRawMediaProcessor>();
         services.AddTransient<ICleanupRawMediaReporter, CleanupRawMediaReporter>();
