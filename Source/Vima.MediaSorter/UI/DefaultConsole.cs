@@ -7,6 +7,8 @@ public interface IConsole
 {
     bool IsOutputRedirected { get; }
     event ConsoleCancelEventHandler? CancelKeyPress;
+    
+    void FlushInputBuffer();
 
     ConsoleKeyInfo ReadKey(bool intercept);
     string? ReadLine();
@@ -30,9 +32,30 @@ public class DefaultConsole : IConsole
         remove => Console.CancelKeyPress -= value;
     }
 
-    public ConsoleKeyInfo ReadKey(bool intercept) => Console.ReadKey(intercept);
+    public void FlushInputBuffer()
+    {
+        if (IsOutputRedirected)
+        {
+            return;
+        }
 
-    public string? ReadLine() => Console.ReadLine();
+        while (Console.KeyAvailable)
+        {
+            Console.ReadKey(intercept: true);
+        }
+    }
+
+    public ConsoleKeyInfo ReadKey(bool intercept)
+    {
+        FlushInputBuffer();
+        return Console.ReadKey(intercept);
+    }
+
+    public string? ReadLine()
+    {
+        FlushInputBuffer();
+        return Console.ReadLine();
+    }
 
     public void Write(string? value, OutputLevel level)
     {
