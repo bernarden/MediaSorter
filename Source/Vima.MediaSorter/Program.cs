@@ -98,6 +98,7 @@ public static class Program
         services.AddSingleton<IVisualFileHasher, PerceptualVisualFileHasher>();
 
         services.AddTransient<IMediaFileHandler, JpegMediaFileHandler>();
+        services.AddTransient<IMediaFileHandler, HifMediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Cr3MediaFileHandler>();
         services.AddTransient<IMediaFileHandler, Mp4MediaFileHandler>();
 

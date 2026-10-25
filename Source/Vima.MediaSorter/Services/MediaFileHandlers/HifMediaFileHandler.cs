@@ -1,0 +1,44 @@
+using System;
+using System.IO;
+using System.Linq;
+using MetadataExtractor;
+using MetadataExtractor.Formats.Exif;
+using MetadataExtractor.Formats.Heif;
+using Vima.MediaSorter.Domain;
+
+namespace Vima.MediaSorter.Services.MediaFileHandlers;
+
+public class HifMediaFileHandler() : BaseMediaFileHandler(".hif", ".heic", ".heif")
+{
+    public override CreatedOn? GetCreatedOnDateFromMetadata(string filePath)
+    {
+        using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var directories = HeifMetadataReader.ReadMetadata(fs);
+        var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
+        if (subIfdDirectory == null)
+        {
+            return null;
+        }
+
+        if (
+            !subIfdDirectory.TryGetDateTime(
+                ExifDirectoryBase.TagDateTimeOriginal,
+                out var createdOn
+            )
+        )
+        {
+            return null;
+        }
+
+        var subSecStr = subIfdDirectory
+            .GetString(ExifDirectoryBase.TagSubsecondTimeOriginal)
+            ?.Trim();
+        if (!string.IsNullOrEmpty(subSecStr) && int.TryParse(subSecStr, out var subSec))
+        {
+            createdOn = createdOn.AddMilliseconds(subSec * Math.Pow(10, 3 - subSecStr.Length));
+        }
+
+        return new CreatedOn(createdOn, CreatedOnSource.MetadataLocal);
+    }
+}
+
